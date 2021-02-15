@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^11.2.3"
+    "ejs-electron": "^2.1.1",
+    "electron": "^11.2.3",
+    "line-reader": "^0.4.0"
   }
 }
