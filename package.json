@@ -13,6 +13,11 @@
   "devDependencies": {
     "ejs-electron": "^2.1.1",
     "electron": "^11.2.3",
+    "electron-rebuild": "^2.3.5",
     "line-reader": "^0.4.0"
+  },
+  "dependencies": {
+    "electron-context-menu": "^2.4.0",
+    "serialport": "^9.0.6"
   }
 }
