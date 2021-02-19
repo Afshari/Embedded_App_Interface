@@ -4,13 +4,8 @@ const contextMenu = require('electron-context-menu');
 const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
+// const Promise = require('bluebird');
 
-
-// SerialPort.list().then(function(ports){
-//   ports.forEach(function(port){
-//     console.log("Port: ", port);
-//   })
-// });
 
 function createWindow (ports) {
   const win = new BrowserWindow({
@@ -20,10 +15,15 @@ function createWindow (ports) {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/ids.ejs', {query: {"ports": JSON.stringify(ports)}})
+  win.loadFile('front_end/ids.ejs', { query: { "ports": JSON.stringify(ports) } })
 }
 
 let port;
+var inputData = [];
+var outputData = [];
+var dataIndex = 0;
+
+let intervalObj;
 
 ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
 
@@ -34,25 +34,76 @@ ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
 			console.log('Error: ', err.message);
 		});
 		port.on('data', function(data){
-			console.log("Received Data => ", data.toString());
+			let result = data.toString()
+			if(result == outputData[dataIndex]) {
+				if(result == "1,0")
+					event.reply('TBL:update', 1);
+				else
+					event.reply('TBL:update', 4);
+			} else {
+				if(result == "1,0")
+					event.reply('TBL:update', 3);
+				else
+					event.reply('TBL:update', 2);
+			}
+			dataIndex += 1;
+			if(dataIndex >= inputData.length) {
+				clearInterval(intervalObj);
+				console.log("Finished");
+			}
 		});
 	}
-	function sendCommand(data){
+	function sendCommand(data) {
 		port.write(data, (err) => {
 			if (err) console.log('Error on write: ', err.message);
-			console.log(data);
 		});
 	}
 
-	lineReader.eachLine(input_path, function(line, last) {
-		// console.log(line.length);
-		// console.log(line.split(','));
-		// do whatever you want with line...
-		if(last){
-			// or check if it's the last one
-			console.log("Sent");
-			sendCommand("Hello");
+	function sendData() {
+		inputData[dataIndex].split(',').forEach( (value) => {
+			let fValue = parseFloat(value);
+			if(fValue >= 0) {
+				value = value.replace('-', '');
+				value = "+" + value;
+			}
+			sendCommand(value);
+		});
+	}
+
+
+	if(inputData.length === 0) {
+
+		function readInputFile() {
+			lineReader.eachLine(input_path, function(line, last) {
+				inputData.push(line);
+				if(last) {
+					readOutputFile();
+				}
+			});
 		}
+
+		function readOutputFile() {
+			lineReader.eachLine(output_path, function(line, last) {
+				outputData.push(line);
+				if(last) {
+					intervalObj = setInterval(() => {
+						sendData();
+					}, 200);
+				}
+			});
+		}
+
+		readInputFile();
+
+	} else {
+		sendData();
+	}
+
+});
+
+ipcMain.on('uart:reload', (event) => {
+	SerialPort.list().then(function(ports){
+		event.reply('uart:data', ports);
 	});
 });
 

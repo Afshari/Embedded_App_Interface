@@ -929,7 +929,7 @@ PANELS CONFIGURATIONS
 /*Panel Size*/
 
 .pn {
-	height: 250px;
+	height: 180px;
 	box-shadow: 0 2px 1px rgba(0, 0, 0, 0.2);
 }
 
@@ -995,10 +995,10 @@ PANELS CONFIGURATIONS
 /*Green Panel*/
 .green-panel {
 	text-align: center;
-	background: #4ECDC4;
+	background: #076d66;
 }
 .green-panel .green-header {
-	background: #43b1a9;
+	background: #005a4b;
 	padding: 3px;
 	margin-bottom: 15px;
 }
@@ -1011,9 +1011,40 @@ PANELS CONFIGURATIONS
 	color: white;
 	font-weight: 100;
 }
+.green-panel h1 {
+    color: white;
+}
 .green-panel p {
 	color: white;
 }
+
+/*Red Panel*/
+.red-panel {
+	text-align: center;
+	background: #7c2323;
+}
+.red-panel .red-header {
+	background: #470202;
+	padding: 3px;
+	margin-bottom: 15px;
+}
+.red-panel h5 {
+	color: white;
+	font-weight: 200;
+	margin-top: 10px;
+}
+.red-panel h3 {
+	color: white;
+	font-weight: 100;
+}
+.red-panel h1 {
+	color: white;
+}
+.red-panel p {
+	color: white;
+}
+
+
 
 /*White Panel */
 .white-panel {
