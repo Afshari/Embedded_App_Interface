@@ -19,6 +19,7 @@
   "dependencies": {
     "bluebird": "^3.7.2",
     "electron-context-menu": "^2.4.0",
+    "linear-algebra": "^3.1.4",
     "serialport": "^9.0.6"
   }
 }

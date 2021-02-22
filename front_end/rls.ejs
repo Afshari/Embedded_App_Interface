@@ -1,0 +1,100 @@
+<%- include('./import_above_content.ejs', { Title: "Recursive Least Squares", PageAddr: 'rls' } ) %>
+<div class="col-lg">
+	<div class="content-panel">
+		<h4><i class="fa fa-angle-right"></i> Line</h4>
+		<div class="panel-body text-center">
+			<canvas id="line"  ></canvas>
+		</div>
+	</div>
+</div>
+<%- include('./import_below_content.ejs', { renderChartJS: true  } ) %>
+
+
+<script type="text/javascript">
+
+
+	var chartOptions = { 
+		animation: false,
+		scales: {
+			yAxes: [{
+				ticks: {
+					// min: 0,
+					// max: 20,
+					callback: function(value, index, values) {
+						console.log('xAxes index: ', index);
+						return '$' + value;
+					}
+				},
+			}]
+		}
+	};
+
+	const electron = require('electron');
+	const { ipcRenderer } = electron;
+
+
+	var lineChartData = {
+		labels: [],
+		datasets: [
+			{
+				label: "x0",
+				borderColor: 		'rgb(255, 99, 132)',
+				fill: false,
+                data : []
+            },
+            {
+				label: "x1",
+				borderColor: 		"rgba(151,187,205,1)",
+				fill: false,
+                data : []
+            }
+		]
+	};
+	var ctx = document.getElementById('line').getContext('2d');
+	var chart = new Chart(ctx, {
+		// The type of chart we want to create
+		type: 'line',
+
+		// The data for our dataset
+		data: lineChartData,
+
+		// Configuration options go here
+		options: {
+			scales: {
+				yAxes: [{
+					ticks: {
+						min: 0,
+						max: 25,
+					},
+				}]
+			}
+		}
+	});
+
+	// chart.data = lineChartData;
+
+	$(document).ready(function() {
+
+		ipcRenderer.send('rls:ready:receive');
+
+		ipcRenderer.on('rls:x:data', function (event, x) {
+
+
+			if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
+				var labels = [];
+				for(var i = 0; i < 100; i++)
+					labels.push("");
+				chart.data.labels = labels;
+			}
+			chart.data.datasets[0].data.push(x[0]);
+			chart.data.datasets[1].data.push(x[1]);
+			chart.update();
+
+		});
+
+	});
+
+
+
+
+</script>

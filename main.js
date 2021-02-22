@@ -4,7 +4,9 @@ const contextMenu = require('electron-context-menu');
 const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
-// const Promise = require('bluebird');
+var linearAlgebra = require('linear-algebra')(),     // initialise it
+		Vector = linearAlgebra.Vector,
+		Matrix = linearAlgebra.Matrix;
 
 
 function createWindow() {
@@ -15,7 +17,7 @@ function createWindow() {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/lite_ids.ejs')
+  win.loadFile('front_end/rls.ejs')
 }
 
 let port;
@@ -106,6 +108,45 @@ ipcMain.on('uart:reload', (event) => {
 		event.reply('uart:data', ports);
 	});
 });
+
+
+ipcMain.on('rls:ready:receive', (event) => {
+
+	let x = new Matrix([[10], [5]]);
+	let xhat = new Matrix([[8], [7]]);
+	let R = new Matrix([[ Math.sqrt(0.1) ]]);
+	var k = 1;
+
+	console.log("x: ", x);
+	console.log("xhat: ", xhat);
+	console.log("R: ", R);
+	// H = np.array([[1, 0.99**(k-1)]])
+	var H = new Matrix([[1, Math.pow(0.99, k-1)]]);
+	k += 1;
+	//  y = H @ x + np.sqrt(R) * np.random.randn()
+	let rnd = new Matrix([[ Math.random() ]]);
+	var y = H.dot(x).plus( R.dot(rnd) );
+	console.log("H: ", H);
+	console.log("y: ", y);
+
+
+	event.reply('rls:x:data', [10, 20]);
+	var timeCounter = 0;
+	let interval = setInterval(() => {
+
+		H = new Matrix([[1, Math.pow(0.99, k-1)]]);
+		k += 1;
+		rnd = new Matrix([[ Math.random() ]]);
+		y = H.dot(x).plus( R.dot(rnd) );
+		console.log("y: ", y);
+
+		event.reply('rls:x:data', [10, 20]);
+		timeCounter += 1;
+		if(timeCounter > 100)
+			clearInterval(interval);
+	}, 1000);
+});
+
 
 app.whenReady().then(function() {
 	createWindow()
