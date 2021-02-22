@@ -15,7 +15,7 @@ function createWindow() {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/ids.ejs')
+  win.loadFile('front_end/lite_ids.ejs')
 }
 
 let port;
