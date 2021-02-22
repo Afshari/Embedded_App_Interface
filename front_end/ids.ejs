@@ -1,4 +1,5 @@
-<%- include('./import_above_content.ejs', { Title: "Intrusion Detection System" } ) %>
+<%- include('./import_above_content.ejs', { Title: "Intrusion Detection System",
+                                            PageAddr: 'ids' } ) %>
 
 
 
@@ -118,13 +119,11 @@
 
     $(document).ready(function() {
 
-        const querystring = require('querystring');
-        let query = querystring.parse(global.location.search);
-        let ports = JSON.parse(query['?ports']);
-        ports.forEach(function(port){
-            $("#uart_select").append(new Option(port['path'], port['path']));
-        });
 
+        // Load UART on Page Load
+        ipcRenderer.send('uart:reload');
+
+        // Load UART on Reload Button Click
         $("#reloadUart").click( (event) => {
             ipcRenderer.send('uart:reload');
         });

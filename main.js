@@ -7,7 +7,7 @@ const lineReader = require('line-reader');
 // const Promise = require('bluebird');
 
 
-function createWindow (ports) {
+function createWindow() {
   const win = new BrowserWindow({
     webPreferences: {
 			enableRemoteModule: true,
@@ -15,7 +15,7 @@ function createWindow (ports) {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/ids.ejs', { query: { "ports": JSON.stringify(ports) } })
+  win.loadFile('front_end/ids.ejs')
 }
 
 let port;
@@ -108,9 +108,7 @@ ipcMain.on('uart:reload', (event) => {
 });
 
 app.whenReady().then(function() {
-	SerialPort.list().then(function(ports){
-		createWindow(ports)
-	});
+	createWindow()
 });
 
 app.on('window-all-closed', () => {
@@ -121,8 +119,6 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-		SerialPort.list().then(function(ports){
-			createWindow(ports)
-		});
+		createWindow()
   }
 })
