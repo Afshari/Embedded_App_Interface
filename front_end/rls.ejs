@@ -2,6 +2,48 @@
 
 <div class="row mt">
     <div class="col-lg-12">
+		<div class="form-panel">
+		<p style="font-family: math; font-size: 18px; line-height: 1.5;">
+			Suppose that a tank contains a concentration \(x_{1}\)  of chemical \(1\), and a concentration
+			\(x_{2}\) of chemical \(2\). You have some instrumentation that can detect the
+			combined concentration (\(x_{1} + x_{2}\)) of the two chemicals, but your instrumentation
+			cannot distinguish between the two chemicals. Chemical \(x_{2}\) is removed
+			from the tank through a leaching process so that its concentration decreases
+			by \(1%\) from one measurement time to the next. The measurement equation
+			is therefore given as:
+
+			$$y_{k} =  x_{1} + 0.99^{k-1} x_{2} + v_{k} $$
+
+			where \(V_{k}\) is the measurement noise, which is a zero-mean random variable
+			with a variance of \(R = 0.01\). Suppose that \(x_{1} = 10\) and \(x_{2} = 5\). Further
+			suppose that your initial estimates are \(\hat{x}_{1} = 8 \)  and \(\hat{x}_{2} = 7 \), with an initial
+			estimation-error variance \(P_{0}\) that is equal to the identity matrix. A recursive
+			least squares algorithm can be implemented as shown in Equation below to
+			estimate the two concentrations:
+
+			$$ \hat{x}_{k} = \hat{x}_{k-1} + K_{k} (y_{k} - H_{k} \hat{x}_{k-1}) $$
+			$$ K_{k} = P_{k-1} H_{k}^T (H_{k} P_{k-1} H_{k}^T + R_{k})^{-1} $$
+			$$ P_{k} = (I - K_{k} H_{k}) P_{k-1}  $$
+
+			The Initial Values are:
+			$$ \hat{x}_{k} = \begin{bmatrix} 8 \\ 7\end{bmatrix} $$
+			$$ H_{k} = \begin{bmatrix} 1 & 0.99^{k-1} \end{bmatrix} $$
+			$$ P_{0} = \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix} $$ 
+			$$ R = \begin{bmatrix} 0.01 \end{bmatrix} $$
+
+			The Real \(x\) value is:
+			$$ x = \begin{bmatrix} 10 \\ 5 \end{bmatrix} $$
+
+			The below Chart is the Process of Estimating \(\hat{x}\) that can reach the Real \(x\) value
+			<br />
+			(Example 3.5 from Optimal State Estimation Kalman Filter 'Dan Simon')
+		</p>
+		</div>
+	</div>
+</div>
+
+<div class="row mt">
+    <div class="col-lg-12">
         <div class="form-panel">
         <h4 class="mb"><i class="fa fa-angle-right"></i> Device Properties</h4>
         <form class="form-horizontal style-form" method="get">
@@ -13,34 +55,6 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
-            <!-- <div class="form-group">
-                <label class="col-sm-2 col-sm-2 control-label">Input Data</label>
-                <div class="col-sm-10">
-                    <div class="fileupload fileupload-new" data-provides="fileupload">
-                    <span class="btn btn-theme02 btn-file">
-                        <span class="fileupload-new"><i class="fa fa-paperclip"></i> Select file</span>
-                    <span class="fileupload-exists"><i class="fa fa-undo"></i> Change</span>
-                    <input type="file" class="default" id="input_fileupload" />
-                    </span>
-                    <span class="fileupload-preview" style="margin-left:5px;"></span>
-                    <a href="advanced_form_components.html#" class="close fileupload-exists" data-dismiss="fileupload" style="float: none; margin-left:5px;"></a>
-                    </div>
-                </div>
-            </div> -->
-            <!-- <div class="form-group">
-                <label class="col-sm-2 col-sm-2 control-label">Output Data</label>
-                <div class="col-sm-10">
-                    <div class="fileupload fileupload-new" data-provides="fileupload">
-                    <span class="btn btn-theme02 btn-file">
-                        <span class="fileupload-new"><i class="fa fa-paperclip"></i> Select file</span>
-                    <span class="fileupload-exists"><i class="fa fa-undo"></i> Change</span>
-                    <input type="file" class="default" id="output_fileupload" />
-                    </span>
-                    <span class="fileupload-preview" style="margin-left:5px;"></span>
-                    <a href="advanced_form_components.html#" class="close fileupload-exists" data-dismiss="fileupload" style="float: none; margin-left:5px;"></a>
-                    </div>
-                </div>
-            </div> -->
             <div class="form-group">
                 <label class="col-sm-2 col-sm-2 control-label"></label>
                 <div class="col-sm-10">
@@ -57,6 +71,12 @@
 <div class="col-lg">
 	<div class="content-panel">
 		<h4><i class="fa fa-angle-right"></i> Line</h4>
+		<div id="x_value" style="font-family: math; font-size: 18px; line-height: 1.5;" class="text-center">
+			$$ x = \begin{bmatrix} 10 \\ 5 \end{bmatrix}    $$
+		</div>
+		<div id="xhat_value" style="font-family: math; font-size: 18px; line-height: 1.5;" class="text-center">
+			$$ \hat{x}_{k} = \begin{bmatrix} 8 \\ 7 \end{bmatrix} $$
+		</div>
 		<div class="panel-body text-center">
 			<canvas id="line"  ></canvas>
 		</div>
@@ -64,12 +84,20 @@
 </div>
 
 <%- include('./import_below_content.ejs', { renderChartJS: true  } ) %>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"  id="MathJax-script" ></script> -->
+<link rel="stylesheet" href="lib/katex/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
+<!-- The loading of KaTeX is deferred to speed up page rendering -->
+<script defer src="lib/katex/katex.min.js" integrity="sha384-g7c+Jr9ZivxKLnZTDUhnkOnsh30B4H0rpLUpJ4jAIKs4fnJI+sEnkvrMWph2EDg4" crossorigin="anonymous"></script>
 
+<!-- To automatically render math in text elements, include the auto-render extension: -->
+<script defer src="lib/katex//auto-render.min.js" integrity="sha384-mll67QQFJfxn0IYznZYonOWZ644AWYC+Pt2cHqMaRhXVrursRwvLnLaebdGIlYNa" crossorigin="anonymous"
+	onload="renderMathInElement(document.body);"></script>
 
 <script type="text/javascript">
 
 	const electron = require('electron');
 	const { ipcRenderer } = electron;
+	var mathjaxHelper = require('mathjax-electron')
 
 
 	var lineChartData = {
@@ -116,6 +144,17 @@
 
 	$(document).ready(function() {
 
+		var element_x = document.getElementById("x_value");
+		katex.render(String.raw`  x = \begin{bmatrix} 10 \\ 5 \end{bmatrix}  `, element_x, {
+			displayMode: true,
+			throwOnError: false
+		});
+		var element_xhat = document.getElementById("xhat_value");
+		katex.render(String.raw`  \hat{x}_{k} = \begin{bmatrix} 8 \\ 7 \end{bmatrix}  `, element_xhat, {
+			displayMode: true,
+			throwOnError: false
+		});
+
 		// Load UART on Page Load
 		ipcRenderer.send('uart:reload');
 
@@ -142,6 +181,7 @@
 
 		// ipcRenderer.send('rls:ready:receive');
 
+
 		ipcRenderer.on('rls:x:data', function (event, x) {
 
 			if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
@@ -154,6 +194,13 @@
 			chart.data.datasets[1].data.push(x[1]);
 			chart.update();
 
+			let x0 = parseFloat(x[0]).toFixed(2);
+			let x1 = parseFloat(x[1]).toFixed(2);
+			var element_xhat = document.getElementById("xhat_value");
+			katex.render(String.raw`  \hat{x}_{k} = \begin{bmatrix} ${x0} \\ ${x1} \end{bmatrix}  `, element_xhat, {
+				displayMode: true,
+				throwOnError: false
+			});
 		});
 
 	});

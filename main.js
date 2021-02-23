@@ -119,7 +119,7 @@ ipcMain.on('rls:ready:receive', (event, uart) => {
 			console.log('Error: ', err.message);
 		});
 		port.on('data', function(data){
-			console.log("Received Data: ", data.toString());
+			// console.log("Received Data: ", data.toString());
 			let result = data.toString().split(" ");
 			event.reply('rls:x:data', [result[0], result[1]]);
 		});
@@ -127,7 +127,7 @@ ipcMain.on('rls:ready:receive', (event, uart) => {
 	function sendCmdRLS(data) {
 		port.write(data, (err) => {
 			if (err) console.log('Error on write: ', err.message);
-			console.log("Sending: ", data);
+			// console.log("Sending: ", data);
 		});
 	}
 	let x = new Matrix([[10], [5]]);
