@@ -5,8 +5,8 @@ const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
 var linearAlgebra = require('linear-algebra')(),     // initialise it
-		Vector = linearAlgebra.Vector,
-		Matrix = linearAlgebra.Matrix;
+					Vector = linearAlgebra.Vector,
+					Matrix = linearAlgebra.Matrix;
 
 
 function createWindow() {
@@ -110,16 +110,34 @@ ipcMain.on('uart:reload', (event) => {
 });
 
 
-ipcMain.on('rls:ready:receive', (event) => {
+ipcMain.on('rls:ready:receive', (event, uart) => {
 
+	if ( typeof port === 'undefined' ) {
+		port = new SerialPort(uart, { baudRate: 115200 });
+
+		port.on('error', function(err) {
+			console.log('Error: ', err.message);
+		});
+		port.on('data', function(data){
+			console.log("Received Data: ", data.toString());
+			let result = data.toString().split(" ");
+			event.reply('rls:x:data', [result[0], result[1]]);
+		});
+	}
+	function sendCmdRLS(data) {
+		port.write(data, (err) => {
+			if (err) console.log('Error on write: ', err.message);
+			console.log("Sending: ", data);
+		});
+	}
 	let x = new Matrix([[10], [5]]);
 	let xhat = new Matrix([[8], [7]]);
 	let R = new Matrix([[ Math.sqrt(0.1) ]]);
 	var k = 1;
 
-	console.log("x: ", x);
-	console.log("xhat: ", xhat);
-	console.log("R: ", R);
+	// console.log("x: ", x);
+	// console.log("xhat: ", xhat);
+	// console.log("R: ", R);
 	// H = np.array([[1, 0.99**(k-1)]])
 	var H = new Matrix([[1, Math.pow(0.99, k-1)]]);
 	k += 1;
@@ -129,8 +147,11 @@ ipcMain.on('rls:ready:receive', (event) => {
 	console.log("H: ", H);
 	console.log("y: ", y);
 
+	// event.reply('rls:x:data', [10, 20]);
+	strH = H.data[0][1].toFixed(4).toString();
+	strY = y.data[0][0].toFixed(4).padStart(7, "0");
+	sendCmdRLS(`${strH} ${strY}`);
 
-	event.reply('rls:x:data', [10, 20]);
 	var timeCounter = 0;
 	let interval = setInterval(() => {
 
@@ -138,13 +159,20 @@ ipcMain.on('rls:ready:receive', (event) => {
 		k += 1;
 		rnd = new Matrix([[ Math.random() ]]);
 		y = H.dot(x).plus( R.dot(rnd) );
-		console.log("y: ", y);
 
-		event.reply('rls:x:data', [10, 20]);
+		strH = H.data[0][1].toFixed(4).toString();
+		strY = y.data[0][0].toFixed(4).padStart(7, "0");
+		// console.log(`H: ${strH} -- y: ${strY}`);
+
+		// console.log(`${strH} ${strY}`);
+		sendCmdRLS(`${strH} ${strY}`);
+
+		// event.reply('rls:x:data', [10, 20]);
 		timeCounter += 1;
 		if(timeCounter > 100)
 			clearInterval(interval);
 	}, 1000);
+
 });
 
 

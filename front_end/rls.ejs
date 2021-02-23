@@ -1,4 +1,59 @@
 <%- include('./import_above_content.ejs', { Title: "Recursive Least Squares", PageAddr: 'rls' } ) %>
+
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Device Properties</h4>
+        <form class="form-horizontal style-form" method="get">
+            <div class="form-group">
+                <label class="col-sm-2 col-sm-2 control-label">UART:</label>
+                <div class="col-sm-8">
+                    <select class="form-control" id="uart_select">
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
+            </div>
+            <!-- <div class="form-group">
+                <label class="col-sm-2 col-sm-2 control-label">Input Data</label>
+                <div class="col-sm-10">
+                    <div class="fileupload fileupload-new" data-provides="fileupload">
+                    <span class="btn btn-theme02 btn-file">
+                        <span class="fileupload-new"><i class="fa fa-paperclip"></i> Select file</span>
+                    <span class="fileupload-exists"><i class="fa fa-undo"></i> Change</span>
+                    <input type="file" class="default" id="input_fileupload" />
+                    </span>
+                    <span class="fileupload-preview" style="margin-left:5px;"></span>
+                    <a href="advanced_form_components.html#" class="close fileupload-exists" data-dismiss="fileupload" style="float: none; margin-left:5px;"></a>
+                    </div>
+                </div>
+            </div> -->
+            <!-- <div class="form-group">
+                <label class="col-sm-2 col-sm-2 control-label">Output Data</label>
+                <div class="col-sm-10">
+                    <div class="fileupload fileupload-new" data-provides="fileupload">
+                    <span class="btn btn-theme02 btn-file">
+                        <span class="fileupload-new"><i class="fa fa-paperclip"></i> Select file</span>
+                    <span class="fileupload-exists"><i class="fa fa-undo"></i> Change</span>
+                    <input type="file" class="default" id="output_fileupload" />
+                    </span>
+                    <span class="fileupload-preview" style="margin-left:5px;"></span>
+                    <a href="advanced_form_components.html#" class="close fileupload-exists" data-dismiss="fileupload" style="float: none; margin-left:5px;"></a>
+                    </div>
+                </div>
+            </div> -->
+            <div class="form-group">
+                <label class="col-sm-2 col-sm-2 control-label"></label>
+                <div class="col-sm-10">
+                    <button type="submit" class="btn btn-theme" id="btn_start">Start</button>
+                </div>
+            </div>
+        </form>
+        </div>
+    </div>
+    <!-- col-lg-8-->
+</div>
+<!-- /row -->
+
 <div class="col-lg">
 	<div class="content-panel">
 		<h4><i class="fa fa-angle-right"></i> Line</h4>
@@ -7,27 +62,11 @@
 		</div>
 	</div>
 </div>
+
 <%- include('./import_below_content.ejs', { renderChartJS: true  } ) %>
 
 
 <script type="text/javascript">
-
-
-	var chartOptions = { 
-		animation: false,
-		scales: {
-			yAxes: [{
-				ticks: {
-					// min: 0,
-					// max: 20,
-					callback: function(value, index, values) {
-						console.log('xAxes index: ', index);
-						return '$' + value;
-					}
-				},
-			}]
-		}
-	};
 
 	const electron = require('electron');
 	const { ipcRenderer } = electron;
@@ -35,14 +74,12 @@
 
 	var lineChartData = {
 		labels: [],
-		datasets: [
-			{
+		datasets: [{
 				label: "x0",
 				borderColor: 		'rgb(255, 99, 132)',
 				fill: false,
                 data : []
-            },
-            {
+            }, {
 				label: "x1",
 				borderColor: 		"rgba(151,187,205,1)",
 				fill: false,
@@ -63,22 +100,49 @@
 			scales: {
 				yAxes: [{
 					ticks: {
-						min: 0,
-						max: 25,
+						min: 3,
+						max: 12,
 					},
+				}],
+				xAxes: [{
+					gridLines: {
+						color: "rgba(0, 0, 0, 0)",
+					}
 				}]
 			}
 		}
 	});
 
-	// chart.data = lineChartData;
 
 	$(document).ready(function() {
 
-		ipcRenderer.send('rls:ready:receive');
+		// Load UART on Page Load
+		ipcRenderer.send('uart:reload');
+
+		// Load UART on Reload Button Click
+		$("#reloadUart").click( (event) => {
+            ipcRenderer.send('uart:reload');
+        });
+
+		ipcRenderer.on('uart:data', (event, ports) => {
+
+			$('#uart_select').find('option').remove();
+			ports.forEach(function(port){
+				$("#uart_select").append(new Option(port['path'], port['path']));
+			});
+		});
+
+
+		$("#btn_start").click( (event) => {
+            event.preventDefault();
+
+			var uart = $("#uart_select").val();
+			ipcRenderer.send('rls:ready:receive', uart);
+		});
+
+		// ipcRenderer.send('rls:ready:receive');
 
 		ipcRenderer.on('rls:x:data', function (event, x) {
-
 
 			if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
 				var labels = [];
@@ -93,8 +157,6 @@
 		});
 
 	});
-
-
 
 
 </script>
