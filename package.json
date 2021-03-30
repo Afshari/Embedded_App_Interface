@@ -23,6 +23,6 @@
     "linear-algebra": "^3.1.4",
     "mathjax": "^3.1.2",
     "mathjax-electron": "^3.0.0",
-    "serialport": "^9.0.6"
+    "serialport": "^9.0.7"
   }
 }
