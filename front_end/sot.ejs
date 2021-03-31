@@ -1,0 +1,159 @@
+<%- include('./import_above_content.ejs', { Title: "Single Object Tracking", PageAddr: 'sot' } ) %>
+
+
+<main>
+</main>
+
+
+
+<%- include('./import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
+
+
+const windowWidth = 900;
+const windowHeight = 600;
+var objToDraw = null
+
+var groundTruthX = 0
+var groundTruthY = 0
+
+// const matrix = Matrix.ones(5, 5);
+
+var HH = new Matrix([ [1., 0., 0., 0.],
+                      [0., 0., 1., 0.] ])
+
+
+var arrayMaxIndex = function(array) {
+  return array.indexOf(Math.max.apply(null, array));
+};
+var arrayMinIndex = function(array) {
+  return array.indexOf(Math.min.apply(null, array));
+};
+
+
+
+function getWidthHeightOrient(covar, HH) {
+
+
+    var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
+    var w = e.realEigenvalues;
+    console.log(w)
+    var v = e.eigenvectorMatrix;
+    console.log(v)
+    max_ind = arrayMaxIndex(w)
+    min_ind = arrayMinIndex(w)
+
+    var width  = 2 * Math.sqrt(w[max_ind])
+    var height = 2 * Math.sqrt(w[min_ind])
+
+    var orientation = Math.atan2( v.data[1][max_ind], v.data[0][max_ind])
+    
+    return { width: width, height: height, orientation: orientation }
+}
+
+
+$(document).ready( () => {
+
+    const { ipcRenderer } = require('electron')
+
+    ipcRenderer.on('sot:draw', (event, args) => {
+        objToDraw = args
+        // console.log(args)
+    })
+
+});
+
+let scl = 20
+
+function moveX(x) {
+    return windowWidth/2 + (x * scl)
+}
+
+function moveY(y) {
+    return windowHeight  - (y * scl) - 10
+}
+
+function setup() {
+    
+    createCanvas(windowWidth, windowHeight);
+    
+    background(255, 255, 255);
+    strokeWeight(2);
+    stroke(0);
+    rect(0, 0, windowWidth, windowHeight);
+    
+
+}
+
+function draw() {
+    
+    
+
+    if(objToDraw != null) {
+
+        noStroke()
+        fill(0, 0, 255, 255)
+
+        let x = moveX(objToDraw['x'])  // windowWidth/2 + (objToDraw['x'] * scl)
+        let y = moveY(objToDraw['y']) // windowHeight  - (objToDraw['y'] * scl) - 10
+        circle(x, y, 5);
+
+        console.log(groundTruthX)
+        console.log(objToDraw['truthX'])
+        console.log('............')
+        stroke(0, 0, 255)
+        strokeWeight(3)
+        line(moveX(groundTruthX), moveY(groundTruthY), moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+        
+        groundTruthX = objToDraw['truthX']
+        groundTruthY = objToDraw['truthY']
+        
+
+        var strCovar = objToDraw['covar'].split(',')
+        
+        var covar = Matrix.zeros(4, 4);
+        for(var i = 0; i < covar.rows; i++) {
+            for(var j = 0; j < covar.columns; j++) {
+                covar.set(i, j, parseFloat(strCovar[ (i * 4) + j]))
+            }
+        }
+        
+        fill(0, 0, 255, 50)
+        var uncertainty = getWidthHeightOrient(covar, HH)
+
+        push();
+        translate(x, y);
+        rotate(-uncertainty.orientation)
+        noStroke()
+        ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
+        pop();
+
+        var strMeasurements = objToDraw['measurements'].split(':')
+        // console.log(strMeasurements.length)
+        // console.log(strMeasurements)
+
+        if(strMeasurements.length > 2) {
+
+            fill(0, 255, 255, 255)
+            for(var i = 1; i < strMeasurements.length; i+=3) {
+                var state = strMeasurements[i + 2].split(',')
+
+                let measX = moveX(state[0]) // windowWidth/2 + (parseFloat(state[0] * scl))
+                let measY = moveY(state[1]) // windowHeight  - (parseFloat(state[1] * scl)) - 10
+
+                noStroke()
+                circle(measX, measY, 5)
+            }
+        }
+        
+
+        objToDraw = null;
+    }
+
+}
+
+
+</script>

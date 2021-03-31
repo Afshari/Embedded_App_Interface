@@ -4,9 +4,15 @@ const contextMenu = require('electron-context-menu');
 const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
-var linearAlgebra = require('linear-algebra')(),     // initialise it
+var linearAlgebra = require('linear-algebra')(),  
 					Vector = linearAlgebra.Vector,
 					Matrix = linearAlgebra.Matrix;
+
+const sot = require('./sot')
+
+
+
+// sot.connect()
 
 
 function createWindow() {
@@ -17,7 +23,11 @@ function createWindow() {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/rls.ejs')
+  win.loadFile('front_end/sot.ejs')
+
+  sot.init(win)
+//   sot.readFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
+
 }
 
 let port;
