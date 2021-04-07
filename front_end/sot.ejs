@@ -1,4 +1,4 @@
-<%- include('./import_above_content.ejs', { Title: "Single Object Tracking", PageAddr: 'sot' } ) %>
+<%- include('./import_above_content.ejs', { Title: "Single Object Tracking in Clutter", PageAddr: 'sot' } ) %>
 
 
 <main>
@@ -15,7 +15,7 @@ const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
 
 const windowWidth = 900;
 const windowHeight = 600;
-var objToDraw = null
+var objs = []
 
 var groundTruthX = 0
 var groundTruthY = 0
@@ -37,12 +37,11 @@ var arrayMinIndex = function(array) {
 
 function getWidthHeightOrient(covar, HH) {
 
-
     var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
     var w = e.realEigenvalues;
-    console.log(w)
+    // console.log(w)
     var v = e.eigenvectorMatrix;
-    console.log(v)
+    // console.log(v)
     max_ind = arrayMaxIndex(w)
     min_ind = arrayMinIndex(w)
 
@@ -60,8 +59,7 @@ $(document).ready( () => {
     const { ipcRenderer } = require('electron')
 
     ipcRenderer.on('sot:draw', (event, args) => {
-        objToDraw = args
-        // console.log(args)
+        objs.push(args)
     })
 
 });
@@ -76,42 +74,101 @@ function moveY(y) {
     return windowHeight  - (y * scl) - 10
 }
 
-function setup() {
-    
-    createCanvas(windowWidth, windowHeight);
-    
-    background(255, 255, 255);
-    strokeWeight(2);
-    stroke(0);
-    rect(0, 0, windowWidth, windowHeight);
-    
+// let measurementColor = [ 0, 255, 255, 170 ]
+let measurementColor = [ 0, 0, 0, 170 ]
+let groundtruthColor = [ 0, 0, 255, 255 ]
+let estimatedMeanColor = [ 255, 140, 0, 255 ]
+let estimatedCovarColor = [ 255, 0, 0, 90 ]
+let measurementCircleRadius = 5
+
+function drawLegends() {
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Measurements', 40, 30)
+    text('Ground Truth', 40, 50)
+    text('Estimated Mean', 40, 70)
+    text('Estimated Covariance', 40, 90)
+
+
+    noStroke()
+    fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    circle(20, 30, measurementCircleRadius*2)
+
+    fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    circle(20, 50, measurementCircleRadius)
+    stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    strokeWeight(1.5)
+    line(10, 50, 30, 50)
+
+    noStroke()
+    fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    circle(20, 70, measurementCircleRadius)
+
+    noStroke()
+    fill(estimatedCovarColor[0], estimatedCovarColor[1], estimatedCovarColor[2], estimatedCovarColor[3])
+    circle(20, 90, measurementCircleRadius*3)
 
 }
 
-function draw() {
+function drawBackground() {
+
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, windowWidth, windowHeight);
+
+}
+
+
+function setup() {
     
+    createCanvas(windowWidth, windowHeight)
+    
+    drawBackground()
+
+    drawLegends()
+
+    frameRate(10)
+}
+
+
+function draw() {    
     
 
-    if(objToDraw != null) {
+    console.log(getFrameRate())
+    drawBackground()
+    drawLegends()
 
+    // if(objToDraw != null) {
+    objs.forEach(function(objToDraw, index, array) {
+
+
+        // Draw Estimated Mean
         noStroke()
-        fill(0, 0, 255, 255)
+        fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+        let x = moveX(objToDraw['x']) 
+        let y = moveY(objToDraw['y']) 
+        circle(x, y, 5)
 
-        let x = moveX(objToDraw['x'])  // windowWidth/2 + (objToDraw['x'] * scl)
-        let y = moveY(objToDraw['y']) // windowHeight  - (objToDraw['y'] * scl) - 10
-        circle(x, y, 5);
 
-        console.log(groundTruthX)
-        console.log(objToDraw['truthX'])
-        console.log('............')
-        stroke(0, 0, 255)
-        strokeWeight(3)
-        line(moveX(groundTruthX), moveY(groundTruthY), moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
-        
-        groundTruthX = objToDraw['truthX']
-        groundTruthY = objToDraw['truthY']
-        
+        // Draw GroundTruth
+        stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+        strokeWeight(1.5)
 
+        // line(moveX(groundTruthX), moveY(groundTruthY), moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+        if(index > 0) {
+            line(moveX(array[index - 1]['truthX']), moveY(array[index - 1]['truthY']), 
+                moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+        }
+
+        circle(moveX(objToDraw['truthX']), moveY(objToDraw['truthY']), 2)
+                
+
+        // Calculate Covariance
         var strCovar = objToDraw['covar'].split(',')
         
         var covar = Matrix.zeros(4, 4);
@@ -121,37 +178,35 @@ function draw() {
             }
         }
         
-        fill(0, 0, 255, 50)
+        // Draw Ellipse (Covariance)
+        fill(255, 0, 0, 90)
         var uncertainty = getWidthHeightOrient(covar, HH)
 
         push();
-        translate(x, y);
-        rotate(-uncertainty.orientation)
-        noStroke()
-        ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
+            translate(x, y);
+            rotate(-uncertainty.orientation)
+            noStroke()
+            ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
         pop();
 
         var strMeasurements = objToDraw['measurements'].split(':')
-        // console.log(strMeasurements.length)
-        // console.log(strMeasurements)
 
         if(strMeasurements.length > 2) {
 
-            fill(0, 255, 255, 255)
+            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
             for(var i = 1; i < strMeasurements.length; i+=3) {
                 var state = strMeasurements[i + 2].split(',')
 
-                let measX = moveX(state[0]) // windowWidth/2 + (parseFloat(state[0] * scl))
-                let measY = moveY(state[1]) // windowHeight  - (parseFloat(state[1] * scl)) - 10
+                let measX = moveX(state[0])
+                let measY = moveY(state[1])
 
                 noStroke()
-                circle(measX, measY, 5)
+                circle(measX, measY, measurementCircleRadius)
             }
         }
         
 
-        objToDraw = null;
-    }
+    })
 
 }
 
