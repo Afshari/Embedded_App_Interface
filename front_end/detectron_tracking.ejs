@@ -1,0 +1,282 @@
+<%- include('./import_above_content.ejs', { Title: "Detectron & Tracking", PageAddr: 'detectron_tracking' } ) %>
+
+
+<!-- <h3 id='statusH3'>Status: Running</h3> -->
+<!-- <input type="button" value="Click Me"></input> -->
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-success" id="btnPrevFrame">Previous Frame</button>
+    <button type="button" id="btnPause" class="btn btn-primary">Pause</button>
+    <button type="button" class="btn btn-success" id="btnNextFrame">Next Frame</button>
+</div>
+
+<main>
+</main>
+
+
+
+<%- include('./import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+const electron = require('electron');
+const { ipcRenderer } = electron;
+let fs = require('fs')
+var Enum = require('enum')
+
+var State = new Enum( { 'running': 1, 'pause': 2, 'oneFrame': 3, 'reloadFrame': 4 } )
+var state = State.running
+
+const windowWidth = 800;
+const windowHeight = 450;
+
+
+function setStatus(state) {
+    if(state == State.pause) {
+        // $("#statusH3").text("Status: " + "Pause")
+        $("#btnPause").text("Run")
+
+    } else if(state == State.running) {
+        // $("#statusH3").text("Status: " + "Running")
+        $("#btnPause").text("Pause")
+    }
+}
+
+function handlePauseRun() {
+
+    if(state == State.running) {
+        state = State.pause
+        setStatus(state)
+
+    } else if(state == State.pause) {
+        state = State.running
+        setStatus(state)
+    }
+}
+
+function handleNextFrame() {
+    if(imageCounter < listOfData.length - 1 && state == State.pause ) {
+        imageCounter += 1
+        state = State.oneFrame
+    }
+}
+
+function handlePreviousFrame() {
+    if(imageCounter > 0 && state == State.pause) {
+        imageCounter -= 1
+        state = State.oneFrame
+    }
+}
+
+$(document).ready(function() {
+
+    $("#btnPause").click(function(e) {
+        handlePauseRun()
+        e.preventDefault()
+        return false
+    })
+
+    $("#btnPrevFrame").click(function(e) {
+
+        handlePreviousFrame()
+        e.preventDefault()
+        return false
+    })
+
+    $("#btnNextFrame").click(function(e) {
+
+        handleNextFrame()
+        e.preventDefault()
+        return false
+    })
+
+})
+
+
+var cX = 0
+var cY = 0
+const xScl = 7
+const yScl = 3
+
+ipcRenderer.on('tracking:data:get', function (evt, message) {
+    // console.log(typeof message)
+    // console.log('msg ' + message)
+    var msg = String(message).split(',')
+    cX = (parseFloat(msg[0]) * xScl) + (1.5 * windowWidth)
+    cY = windowHeight - (parseFloat(msg[2]) * yScl)
+
+    console.log(cX, cY)
+});
+
+let img;
+
+var listOfData = []
+var allData = []
+var indices = []
+var imageCounter = 0
+var shouldDrawRect = false
+var shouldSendData = false
+var rectX1, rectX2, rectY1, rectY2
+
+
+function setup() {
+    
+    createCanvas(windowWidth*2, windowHeight)
+        
+    let filepath = "/Users/mohsen/Documents/state_estimate_ws/vision/Detectron/boxes_points/cars_10.txt"
+
+    const data = fs.readFileSync(filepath, 'utf-8')
+    allData = data.split('\r\n')
+
+    for(var i = 0; i < allData.length; i++) {
+        if(allData[i].includes('.jpg')) {
+            indices.push(i)
+            listOfData.push(allData[i])
+            
+        }
+    }
+
+    frameRate(5)
+}
+
+function draw() {    
+
+
+    if(imageCounter >= listOfData.length - 1) {
+        // ipcRenderer.send('tracking:send', 'EOF')
+        ipcRenderer.send('tracking:connection:close', 'EOF')
+        noLoop()
+    }
+
+    if(state == State.running && imageCounter < listOfData.length - 1) {
+
+        imageCounter += 1
+        shouldDrawRect = false
+
+        if(shouldSendData) {
+
+            var dataForSend = ''
+            for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+
+                if(allData[i].includes('-----')) {
+
+                    ipcRenderer.send('tracking:send', 'measurements: ' + dataForSend)
+                    break
+                } else {
+                    if(dataForSend != '')
+                        dataForSend += '\n'
+
+                    dataForSend += allData[i]
+
+                    currMeasure = allData[i].split('|')
+                    if(currMeasure[1].length > 1) {
+                        currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
+                        var x = currMeasure[3].replace("'", '')
+                        var y = currMeasure[5].replace("'", '')
+                        x = (parseFloat(x) * xScl) + (1.5 * windowWidth)
+                        y = windowHeight - (parseFloat(y) * yScl)
+                        fill(0, 255, 0)
+                        stroke(0, 255, 0)
+                        circle(x, y, 2)
+                    }
+                } 
+            }
+            console.log("--------")
+        }
+    }  
+    
+    if( state != State.pause && imageCounter < listOfData.length - 1 ) {
+
+        loadImage('../' + listOfData[imageCounter], img => {
+            img.resize(windowWidth, windowHeight)
+            image(img, 0, 0);
+            if(state == State.oneFrame || state == State.reloadFrame)
+                state = State.pause
+
+            if(shouldDrawRect) {
+                fill(255, 255, 255, 128)
+                rect(rectX1, rectY1, rectX2-rectX1, rectY2-rectY1)
+                shouldDrawRect = false
+            }
+        });
+    }
+
+    if(cX != 0 && cY != 0) {
+        fill(0, 0, 255, 128)
+        stroke(0, 0, 255, 128)
+        circle(cX, cY, 2)
+    }
+
+}
+
+function mouseClicked() {
+
+    if(state != State.pause)
+        return false
+
+    if( mouseX < 0 && mouseY < 0 && mouseX > windowWidth && mouseY > windowHeight )
+        return false
+
+    console.log(mouseX, mouseY, imageCounter)
+
+    for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+
+        if(allData[i].includes('-----'))
+            break
+
+        
+        var currData = allData[i].replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+
+        currData = currData.split('|')
+
+        if(currData[1].length > 1) {
+
+            var part1 = currData[0].split(',')
+
+            currX1 = part1[2]/2
+            currY1 = part1[3]/2
+            currX2 = part1[4]/2
+            currY2 = part1[5]/2
+
+            if( currX1 < mouseX && currY1 < mouseY &&
+                currX2 > mouseX && currY2 > mouseY ) {
+
+                    state = State.reloadFrame
+                    shouldDrawRect = true
+                    shouldSendData = true
+                    
+                    ipcRenderer.send('tracking:send', 'prior: ' + allData[i])
+
+                    rectX1 = currX1
+                    rectY1 = currY1
+                    rectX2 = currX2
+                    rectY2 = currY2
+            }
+        }
+
+    }
+
+
+
+    return false;
+}
+
+function keyPressed() {
+    // console.log(keyCode)
+
+    if (keyCode === LEFT_ARROW) {
+        
+        handlePreviousFrame()
+
+    } else if (keyCode === RIGHT_ARROW) {
+
+        handleNextFrame()
+
+    } else if (keyCode ===  "P".charCodeAt(0) ) {
+
+        handlePauseRun()
+    }
+}
+
+
+</script>
+

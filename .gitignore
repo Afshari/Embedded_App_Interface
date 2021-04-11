@@ -3,6 +3,8 @@ bower_components
 node_modules
 dist
 
+data/*
+
 #files
 *.tgz
 *.log

@@ -9,10 +9,7 @@ var linearAlgebra = require('linear-algebra')(),
 					Matrix = linearAlgebra.Matrix;
 
 const sot = require('./sot')
-
-
-
-// sot.connect()
+const detectron_tracking = require('./detectron_tracking')
 
 
 function createWindow() {
@@ -23,9 +20,10 @@ function createWindow() {
     }
   })
 	win.maximize()
-  win.loadFile('front_end/sot.ejs')
+  win.loadFile('front_end/detectron_tracking.ejs')
 
-  sot.init(win)
+  detectron_tracking.init(win)
+//   sot.init(win)
 //   sot.readFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
 
 }
