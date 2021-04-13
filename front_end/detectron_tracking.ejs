@@ -1,4 +1,4 @@
-<%- include('./import_above_content.ejs', { Title: "Detectron & Tracking", PageAddr: 'detectron_tracking' } ) %>
+<%- include('./import_above_content.ejs', { Title: "Detectron & Tracking with JPDA", PageAddr: 'detectron_tracking' } ) %>
 
 
 <!-- <h3 id='statusH3'>Status: Running</h3> -->
@@ -32,14 +32,29 @@ const windowHeight = 450;
 
 function setStatus(state) {
     if(state == State.pause) {
-        // $("#statusH3").text("Status: " + "Pause")
         $("#btnPause").text("Run")
 
     } else if(state == State.running) {
-        // $("#statusH3").text("Status: " + "Running")
         $("#btnPause").text("Pause")
     }
 }
+
+function getRelativeViewX(currX) {
+    return ( (currX - trackingOrigin[1] ) * xScl) + (1.25 * windowWidth)
+}
+
+function getAbsoluteViewX(currX) {
+    return (cX * xScl) + (1.25 * windowWidth)
+}
+
+function getRelativeViewY(currY) {
+    return windowHeight - ( (currY - trackingOrigin[0]) * yScl)
+}
+
+function getAbsoluteViewY(currY) {
+    return windowHeight - (cY * yScl)
+}
+
 
 function handlePauseRun() {
 
@@ -98,13 +113,11 @@ const xScl = 7
 const yScl = 3
 
 ipcRenderer.on('tracking:data:get', function (evt, message) {
-    // console.log(typeof message)
-    // console.log('msg ' + message)
     var msg = String(message).split(',')
-    cX = (parseFloat(msg[0]) * xScl) + (1.5 * windowWidth)
-    cY = windowHeight - (parseFloat(msg[2]) * yScl)
 
-    console.log(cX, cY)
+    cX = parseFloat(msg[0])
+    cY = parseFloat(msg[2])
+
 });
 
 let img;
@@ -118,11 +131,39 @@ var shouldSendData = false
 var rectX1, rectX2, rectY1, rectY2
 
 
+let measurementColor = [0, 255, 0, 255]
+let cameraColor = [0, 255, 255, 255]
+let objColor = [0, 0, 255, 128]
+
+function drawLegends() {
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Measurements', windowWidth+40, 30)
+    text('Camera', windowWidth+40, 50)
+    text('Tracking Object', windowWidth+40, 70)
+
+
+    noStroke()
+    fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    circle(windowWidth+20, 30, 5)
+
+    fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+    circle(windowWidth+20, 50, 5)
+
+    fill(objColor[0], objColor[1], objColor[2], objColor[3])
+    circle(windowWidth+20, 70, 5)
+
+}
+
 function setup() {
     
-    createCanvas(windowWidth*2, windowHeight)
+    createCanvas(3*windowWidth/2, windowHeight)
+    drawLegends()
         
-    let filepath = "/Users/mohsen/Documents/state_estimate_ws/vision/Detectron/boxes_points/cars_10.txt"
+    let filepath = "/Users/mohsen/Documents/state_estimate_ws/vision/Detectron/boxes_points/cars_9.txt"
 
     const data = fs.readFileSync(filepath, 'utf-8')
     allData = data.split('\r\n')
@@ -138,18 +179,22 @@ function setup() {
     frameRate(5)
 }
 
+var trackingOrigin = [-1, -1]
+var currPose = [-1, -1]
+
 function draw() {    
 
 
     if(imageCounter >= listOfData.length - 1) {
-        // ipcRenderer.send('tracking:send', 'EOF')
         ipcRenderer.send('tracking:connection:close', 'EOF')
         noLoop()
     }
 
-    if(state == State.running && imageCounter < listOfData.length - 1) {
+    if( ( state == State.running || state == State.oneFrame ) && imageCounter < listOfData.length - 1) {
 
-        imageCounter += 1
+        if(state == State.running)
+            imageCounter += 1
+
         shouldDrawRect = false
 
         if(shouldSendData) {
@@ -161,6 +206,28 @@ function draw() {
 
                     ipcRenderer.send('tracking:send', 'measurements: ' + dataForSend)
                     break
+                } else if(allData[i].includes('pose')) {
+
+                    var pose = allData[i].replace('pose: ', '').split(',')
+
+                    if(trackingOrigin[0] == -1)
+                        trackingOrigin = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
+
+                    currPose = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
+
+                    // var x = ( (currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+                    // var y = windowHeight - ( (currPose[0] - trackingOrigin[0]) * yScl)
+                    var x = getRelativeViewX(currPose[1])
+                    var y = getRelativeViewY(currPose[0])
+
+                    fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+                    stroke(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+                    circle(x, y, 2)
+
+                    ipcRenderer.send('tracking:send', allData[i])
+
+                } else if(allData[i].includes('trans')) {
+
                 } else {
                     if(dataForSend != '')
                         dataForSend += '\n'
@@ -169,18 +236,23 @@ function draw() {
 
                     currMeasure = allData[i].split('|')
                     if(currMeasure[1].length > 1) {
+
                         currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
                         var x = currMeasure[3].replace("'", '')
                         var y = currMeasure[5].replace("'", '')
-                        x = (parseFloat(x) * xScl) + (1.5 * windowWidth)
-                        y = windowHeight - (parseFloat(y) * yScl)
-                        fill(0, 255, 0)
-                        stroke(0, 255, 0)
+
+                        // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+                        // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
+
+                        x = getRelativeViewX(parseFloat(x) + currPose[1])
+                        y = getRelativeViewY(currPose[0] + parseFloat(y))
+
+                        fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+                        stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
                         circle(x, y, 2)
                     }
                 } 
             }
-            console.log("--------")
         }
     }  
     
@@ -192,7 +264,72 @@ function draw() {
             if(state == State.oneFrame || state == State.reloadFrame)
                 state = State.pause
 
+
+            if(cX != 0 && cY != 0) {
+
+                // cX = (cX * xScl) + (1.5 * windowWidth)
+                // cY = windowHeight - (cY * yScl)
+                cX = getAbsoluteViewX(cX)
+                cY = getAbsoluteViewY(cY)
+
+                minX = 100
+                minY = 100
+                boxVal = ''
+
+                for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+
+                    if(allData[i].includes('-----')) {
+                        break
+                    } else if(allData[i].includes('pose')) {
+
+                    } else if(allData[i].includes('trans')) {
+
+                    } else {
+
+                        currMeasure = allData[i].split('|')
+                        if(currMeasure[1].length > 1) {
+
+                            currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
+                            var x = currMeasure[3].replace("'", '')
+                            var y = currMeasure[5].replace("'", '')
+
+                            // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+                            // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
+
+                            x = getRelativeViewX(parseFloat(x) + currPose[1])
+                            y = getRelativeViewY(currPose[0] + parseFloat(y))
+
+                            if( abs(cX - x) < minX && abs(cY - y) < minY ) {
+                                minX = abs(cX - x)
+                                minY = abs(cY - y)
+                                boxVal = allData[i].split('|')[0]
+                            }
+                        }
+                    } 
+                }
+
+                
+                if( sqrt( sq(minX) + sq(minY) ) < 7 ) {   
+                    boxVal = boxVal.replace('[', '').replace(']', '')
+                    var part1 = boxVal.split(',')
+                    var x1 = part1[2]/2
+                    var y1 = part1[3]/2
+                    var x2 = part1[4]/2
+                    var y2 = part1[5]/2
+                    stroke(255, 255, 255)
+                    fill(255, 255, 255, 128)
+                    rect(x1, y1, x2-x1, y2-y1)
+                } else 
+                    console.log('min ', minX, minY)
+
+                fill(0, 0, 255, 128)
+                stroke(0, 0, 255, 128)
+                circle(cX, cY, 2)
+            }
+
+
             if(shouldDrawRect) {
+                stroke(255, 255, 255)
                 fill(255, 255, 255, 128)
                 rect(rectX1, rectY1, rectX2-rectX1, rectY2-rectY1)
                 shouldDrawRect = false
@@ -200,11 +337,6 @@ function draw() {
         });
     }
 
-    if(cX != 0 && cY != 0) {
-        fill(0, 0, 255, 128)
-        stroke(0, 0, 255, 128)
-        circle(cX, cY, 2)
-    }
 
 }
 
@@ -218,7 +350,7 @@ function mouseClicked() {
 
     console.log(mouseX, mouseY, imageCounter)
 
-    for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+    for(var i = indices[imageCounter] + 3; i < allData.length; i++) {
 
         if(allData[i].includes('-----'))
             break
@@ -261,7 +393,6 @@ function mouseClicked() {
 }
 
 function keyPressed() {
-    // console.log(keyCode)
 
     if (keyCode === LEFT_ARROW) {
         

@@ -190,6 +190,7 @@ app.whenReady().then(function() {
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') {
+	detectron_tracking.exitApp()
     app.quit()
   }
 })

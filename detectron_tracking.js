@@ -4,9 +4,11 @@ const  fs = require('fs')
 const net = require('net')
 
 let mainWindow
+var isActive = false
 
 module.exports = {
-    init
+    init,
+    exitApp
 }
 
 function init(win) {
@@ -15,6 +17,7 @@ function init(win) {
     const timeoutObj = setTimeout(function () {
         
         connect()
+        isActive = true
 
         // listOfData = readDataFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
         // prior = getPrior('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
@@ -32,6 +35,17 @@ function init(win) {
 
 function sendData(data) {
     client.write(data)
+}
+
+
+
+function exitApp() {
+
+    if(isActive == true) {
+        sendData('EOF')
+        client.end()
+        client.destroy()
+    }
 }
 
 ipcMain.on('tracking:send', (event, data) => {
