@@ -74,6 +74,10 @@ function moveY(y) {
     return windowHeight  - (y * scl) - 10
 }
 
+var shouldDraw = false
+var points = []
+var clutters = []
+
 // let measurementColor = [ 0, 255, 255, 170 ]
 let measurementColor = [ 0, 0, 0, 170 ]
 let groundtruthColor = [ 0, 0, 255, 255 ]
@@ -132,83 +136,140 @@ function setup() {
 
     drawLegends()
 
-    frameRate(10)
+    stroke(0)
+    strokeWeight(2)
+
 }
 
 
 function draw() {    
     
 
-    // console.log(getFrameRate())
     drawBackground()
     drawLegends()
 
-    // if(objToDraw != null) {
-    objs.forEach(function(objToDraw, index, array) {
+    if( shouldDraw == true && 
+        mouseX > 0 && mouseX < windowWidth &&
+        mouseY > 0 && mouseY < windowHeight) {
 
+        var canAddPoint = true
+        points.forEach(function(p, index, array) {
+            if(dist(mouseX, mouseY, p[0], p[1]) < 10 )
+                canAddPoint = false
+        })
 
-        // Draw Estimated Mean
-        noStroke()
-        fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
-        let x = moveX(objToDraw['x']) 
-        let y = moveY(objToDraw['y']) 
-        circle(x, y, 5)
+        if(canAddPoint == true)
+            points.push( [mouseX, mouseY] )
 
+    }
 
-        // Draw GroundTruth
+    points.forEach(function(p, index, array) {
+
+        fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
         stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-        strokeWeight(1.5)
-
-        // line(moveX(groundTruthX), moveY(groundTruthY), moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+        circle(p[0], p[1], 3)
         if(index > 0) {
-            line(moveX(array[index - 1]['truthX']), moveY(array[index - 1]['truthY']), 
-                moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+            line(p[0], p[1], array[index - 1][0], array[index - 1][1])
         }
-
-        circle(moveX(objToDraw['truthX']), moveY(objToDraw['truthY']), 2)
-                
-
-        // Calculate Covariance
-        var strCovar = objToDraw['covar'].split(',')
-        
-        var covar = Matrix.zeros(4, 4);
-        for(var i = 0; i < covar.rows; i++) {
-            for(var j = 0; j < covar.columns; j++) {
-                covar.set(i, j, parseFloat(strCovar[ (i * 4) + j]))
-            }
-        }
-        
-        // Draw Ellipse (Covariance)
-        fill(255, 0, 0, 90)
-        var uncertainty = getWidthHeightOrient(covar, HH)
-
-        push();
-            translate(x, y);
-            rotate(-uncertainty.orientation)
-            noStroke()
-            ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
-        pop();
-
-        var strMeasurements = objToDraw['measurements'].split(':')
-
-        if(strMeasurements.length > 2) {
-
-            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-            for(var i = 1; i < strMeasurements.length; i+=3) {
-                var state = strMeasurements[i + 2].split(',')
-
-                let measX = moveX(state[0])
-                let measY = moveY(state[1])
-
-                noStroke()
-                circle(measX, measY, measurementCircleRadius)
-            }
-        }
-        
-
     })
 
+
+    clutters.forEach(function(p, index, array) {
+
+        fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+        stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+        circle(p[0], p[1], 3)
+    })
+
+    // console.log(getFrameRate())
+    
+
+    // objs.forEach(function(objToDraw, index, array) {
+
+
+    //     // Draw Estimated Mean
+    //     noStroke()
+    //     fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    //     let x = moveX(objToDraw['x']) 
+    //     let y = moveY(objToDraw['y']) 
+    //     circle(x, y, 5)
+
+
+    //     // Draw GroundTruth
+    //     stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //     strokeWeight(1.5)
+
+    //     if(index > 0) {
+    //         line(moveX(array[index - 1]['truthX']), moveY(array[index - 1]['truthY']), 
+    //             moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+    //     }
+
+    //     circle(moveX(objToDraw['truthX']), moveY(objToDraw['truthY']), 2)
+                
+
+    //     // Calculate Covariance
+    //     var strCovar = objToDraw['covar'].split(',')
+        
+    //     var covar = Matrix.zeros(4, 4);
+    //     for(var i = 0; i < covar.rows; i++) {
+    //         for(var j = 0; j < covar.columns; j++) {
+    //             covar.set(i, j, parseFloat(strCovar[ (i * 4) + j]))
+    //         }
+    //     }
+        
+    //     // Draw Ellipse (Covariance)
+    //     fill(255, 0, 0, 90)
+    //     var uncertainty = getWidthHeightOrient(covar, HH)
+
+    //     push();
+    //         translate(x, y);
+    //         rotate(-uncertainty.orientation)
+    //         noStroke()
+    //         ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
+    //     pop();
+
+    //     var strMeasurements = objToDraw['measurements'].split(':')
+
+    //     if(strMeasurements.length > 2) {
+
+    //         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         for(var i = 1; i < strMeasurements.length; i+=3) {
+    //             var state = strMeasurements[i + 2].split(',')
+
+    //             let measX = moveX(state[0])
+    //             let measY = moveY(state[1])
+
+    //             noStroke()
+    //             circle(measX, measY, measurementCircleRadius)
+    //         }
+    //     }
+        
+
+    // })
 }
 
+function keyPressed() {
+    if(key == 'e') {
+        points = []
+        clutters = []
+    } else if(key == 'd') {
+        for(var j = 0; j < 5; j++) {
+            clutters.push( [ mouseX + random(-50, 50), mouseY + random(-50, 50) ] )
+        }
+    } else if(key == 'c') {
+        points.forEach(function(p, index, array) {
+           for(var j = 0; j < 2; j++)
+                clutters.push( [ p[0] + random(-10, 10), p[1] + random(-10, 10) ] )
+        })
+    }
+}
+
+function mousePressed() {
+    shouldDraw = true
+}
+
+function mouseReleased() {
+    shouldDraw = false
+}
 
 </script>

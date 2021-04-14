@@ -13,18 +13,19 @@ const detectron_tracking = require('./detectron_tracking')
 
 
 function createWindow() {
-  const win = new BrowserWindow({
-    webPreferences: {
-			enableRemoteModule: true,
-      nodeIntegration: true
-    }
-  })
+	const win = new BrowserWindow({
+		webPreferences: {
+				enableRemoteModule: true,
+			nodeIntegration: true
+		}
+	})
 	win.maximize()
-  win.loadFile('front_end/detectron_tracking.ejs')
-
-  detectron_tracking.init(win)
+	// win.loadFile('front_end/sot.ejs')
+	win.loadFile('front_end/detectron_tracking.ejs')
 //   sot.init(win)
-//   sot.readFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
+	detectron_tracking.init(win)
+
+
 
 }
 

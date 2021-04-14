@@ -6,7 +6,6 @@ const net = require('net')
 
 let mainWindow;
 
-// To export above functions:
 module.exports = {
     init,
     readDataFile,
@@ -17,21 +16,22 @@ let listOfData
 var dataCounter = 0
 let prior
 let listOfGroundTruth
+var isAc
 
 function init(win) {
 
     mainWindow = win
     const timeoutObj = setTimeout(function () {
         
-        connect()
+        // connect()
 
-        listOfData = readDataFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
-        prior = getPrior('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
+        // listOfData = readDataFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
+        // prior = getPrior('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
         
-        listOfGroundTruth = readGroundTruthFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/ground_truth.txt')
+        // listOfGroundTruth = readGroundTruthFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/ground_truth.txt')
         // loopThroughSplittedText(listOfData, listOfGroundTruth)
 
-        sendPrior(prior)
+        // sendPrior(prior)
         
 
         clearTimeout(timeoutObj)
