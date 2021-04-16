@@ -3,7 +3,7 @@ bower_components
 node_modules
 dist
 
-data/*
+data/environment_images/*
 
 #files
 *.tgz
@@ -21,6 +21,7 @@ data/*
 *.pyc
 *.sln
 *.swp
+*.swo
 *.VC.db
 *.VC.VC.opendb
 *.vcxproj

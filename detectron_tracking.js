@@ -1,6 +1,6 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
-const  fs = require('fs')
+// const  fs = require('fs')
 const net = require('net')
 
 let mainWindow
@@ -27,57 +27,94 @@ function init(win) {
 
         // sendPrior(prior)
 
-        sendData("Let's Start")
+        sendDataVision("Let's Start")
         clearTimeout(timeoutObj)
 
     }, 2000)
 }
 
-function sendData(data) {
-    client.write(data)
+function sendDataVision(data) {
+
+    clientVision.write(data)
 }
 
+function sendDataTracking(data) {
 
+    clientTracking.write(data)
+}
 
 function exitApp() {
 
     if(isActive == true) {
-        sendData('EOF')
-        client.end()
-        client.destroy()
+
+        sendDataVision('EOF')
+        sendDataTracking('EOF')
+        clientVision.end()
+        clientTracking.end()
+        clientVision.destroy()
+        clientTracking.destroy()
     }
 }
 
-ipcMain.on('tracking:send', (event, data) => {
-    sendData(data)
+ipcMain.on('tracking:vision:send', (event, data) => {
+
+    sendDataVision(data)
 })
 
+ipcMain.on('tracking:tracking:send', (event, data) => {
+
+    sendDataTracking(data)
+})
+
+
+var clientVision = new net.Socket()
+var clientTracking = new net.Socket()
 
 ipcMain.on('tracking:connection:close', (event) => {
-    sendData('EOF')
-    client.end()
-    client.destroy()
-})
 
-var client = new net.Socket();
+    sendDataVision('EOF')
+    sendDataTracking('EOF')
+    clientVision.end()
+    clientTracking.end()
+    clientVision.destroy()
+    clientTracking.destroy()
+})
 
 function connect() {
-    client.connect(6070, '127.0.0.1', function() {
-        console.log('Connected');
-    });
+
+    clientVision.connect(6070, '127.0.0.1', function() {
+        console.log('Connected to Vision');
+    })
+
+    clientTracking.connect(6060, '127.0.0.1', function() {
+        console.log('Connected to Tracking');
+    })
 }
 
-client.on('data', function(data) {
-    // console.log('Received: ' + data)
-    mainWindow.webContents.send('tracking:data:get', String(data).split(','))
-    
+clientVision.on('data', function(data) {
+
+    mainWindow.webContents.send('tracking:vision:data:get', String(data))
+    // mainWindow.webContents.send('tracking:vision:data:get', String(data).split(','))
 })
 
-client.on('close', function() {
-	console.log('Connection closed');
+clientTracking.on('data', function(data) {
+
+    mainWindow.webContents.send('tracking:tracking:data:get', String(data))
+})
+
+
+clientVision.on('close', function() {
+	console.log('Vision Connection closed');
 });
 
-client.on('error', function(err) {
-    // client.destroy()
-    console.log('Connection error');
+clientVision.on('error', function(err) {
+    console.log('Vision Connection error');
+});
+
+clientTracking.on('close', function() {
+	console.log('Tracking Connection closed');
+});
+
+clientTracking.on('error', function(err) {
+    console.log('Tracking Connection error');
 });

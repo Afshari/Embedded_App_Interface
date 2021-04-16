@@ -5,7 +5,7 @@
 <!-- <input type="button" value="Click Me"></input> -->
 <div style="margin: 5px;">
     <button type="button" class="btn btn-success" id="btnPrevFrame">Previous Frame</button>
-    <button type="button" id="btnPause" class="btn btn-primary">Pause</button>
+    <button type="button" id="btnPause" class="btn btn-primary">Run</button>
     <button type="button" class="btn btn-success" id="btnNextFrame">Next Frame</button>
 </div>
 
@@ -23,20 +23,40 @@ const { ipcRenderer } = electron;
 let fs = require('fs')
 var Enum = require('enum')
 
-var State = new Enum( { 'running': 1, 'pause': 2, 'oneFrame': 3, 'reloadFrame': 4 } )
-var state = State.running
+var State = new Enum( { 
+
+    'pause': 1,
+
+    'sendImageName_VisualizeOnly': 5, 
+    'waitForMeasurements_VisualizeOnly': 6, 
+    'drawResults_VisualizeOnly': 9,
+
+    'pause_Tracking': 10,
+
+    'sendPrior': 11,
+    'waitForPriorAck': 12,
+
+    'sendImageName_VisualizeW_Tracking': 15, 
+    'waitForMeasurements_VisualizeW_Tracking': 16, 
+
+    'sendMeasurement': 17,
+    'waitForPrediction': 18,
+
+    'drawResults_VisualizeW_Tracking': 19
+
+} )
+
+var state = State.pause
+var lastState = State.pause
 
 const windowWidth = 800;
 const windowHeight = 450;
 
 
-function setStatus(state) {
-    if(state == State.pause) {
-        $("#btnPause").text("Run")
+function setStatus(status) {
 
-    } else if(state == State.running) {
-        $("#btnPause").text("Pause")
-    }
+    $("#btnPause").text(status)
+
 }
 
 function getRelativeViewX(currX) {
@@ -58,13 +78,24 @@ function getAbsoluteViewY(currY) {
 
 function handlePauseRun() {
 
-    if(state == State.running) {
-        state = State.pause
-        setStatus(state)
+    if(state != State.pause && state != State.pause_Tracking ) {
+
+        if(state.value < 10)
+            state = State.pause
+        else
+            state = State.pause_Tracking
+
+        setStatus("Run")
 
     } else if(state == State.pause) {
-        state = State.running
-        setStatus(state)
+        
+        state = State.sendImageName_VisualizeOnly
+        setStatus("Pause")
+
+    } else if(state == State.pause_Tracking) {
+
+        state = State.sendImageName_VisualizeW_Tracking
+        setStatus("Pause")
     }
 }
 
@@ -112,15 +143,45 @@ var cY = 0
 const xScl = 7
 const yScl = 3
 
-ipcRenderer.on('tracking:data:get', function (evt, message) {
-    var msg = String(message).split(',')
+var measurements = null
+var pose = null
 
-    cX = parseFloat(msg[0])
-    cY = parseFloat(msg[2])
+ipcRenderer.on('tracking:vision:data:get', function (evt, message) {
 
+    // console.log(message)
+
+    var messageArr = message.split('$')
+    // console.log(messageArr)
+
+    if(state == State.waitForMeasurements_VisualizeOnly) {
+
+        measurements = String(messageArr[0])
+        pose = String(messageArr[1]).split(',')
+        state = State.drawResults_VisualizeOnly
+
+    } else if(state == State.waitForMeasurements_VisualizeW_Tracking) {
+
+        measurements = String(messageArr[0])
+        pose = String(messageArr[1]).split(',')
+        state = State.waitForPrediction
+        ipcRenderer.send('tracking:tracking:send', 'measurements: ' + message)
+    }
+    
+    // console.log(measurements)
+    // measurements = String(message).split(';')
 });
 
-let img;
+ipcRenderer.on('tracking:tracking:data:get', function (evt, message) {
+
+    if(state == State.waitForPrediction) {
+        message = message.split(',')
+        cX = parseFloat(message[0])
+        cY = parseFloat(message[2])
+        state = State.drawResults_VisualizeW_Tracking
+    }    
+});
+
+let currImage = null
 
 var listOfData = []
 var allData = []
@@ -129,7 +190,7 @@ var imageCounter = 0
 var shouldDrawRect = false
 var shouldSendData = false
 var rectX1, rectX2, rectY1, rectY2
-
+let imageNames;
 
 let measurementColor = [0, 255, 0, 255]
 let cameraColor = [0, 255, 255, 255]
@@ -163,20 +224,15 @@ function setup() {
     createCanvas(3*windowWidth/2, windowHeight)
     drawLegends()
         
-    let filepath = "/Users/mohsen/Documents/state_estimate_ws/vision/Detectron/boxes_points/cars_10.txt"
+    let filePath = "data/image_file_names.json"
 
-    const data = fs.readFileSync(filepath, 'utf-8')
-    allData = data.split('\r\n')
+    const data = fs.readFileSync(filePath, 'utf-8')
+    imageNames = JSON.parse(data);
 
-    for(var i = 0; i < allData.length; i++) {
-        if(allData[i].includes('.jpg')) {
-            indices.push(i)
-            listOfData.push(allData[i])
-            
-        }
-    }
+    console.log(imageNames.cars_9.length);
+    console.log(imageNames.cars_9[0]);
 
-    frameRate(5)
+    frameRate(10)
 }
 
 var trackingOrigin = [-1, -1]
@@ -185,64 +241,93 @@ var currPose = [-1, -1]
 function draw() {    
 
 
-    if(imageCounter >= listOfData.length - 1) {
-        ipcRenderer.send('tracking:connection:close', 'EOF')
-        noLoop()
-    }
+    // console.log(state)
 
-    if( ( state == State.running || state == State.oneFrame ) && imageCounter < listOfData.length - 1) {
+    if( (state == State.sendImageName_VisualizeOnly || state == State.sendImageName_VisualizeW_Tracking) && 
+        imageCounter < imageNames.cars_9.length) {
 
-        if(state == State.running)
+        if(state == State.sendImageName_VisualizeOnly)
+            state = State.waitForMeasurements_VisualizeOnly
+        else
+            state = State.waitForMeasurements_VisualizeW_Tracking
+
+        ipcRenderer.send('tracking:vision:send', imageNames.cars_9[imageCounter])
+        
+        loadImage('../data/environment_images/' + imageNames.cars_9[imageCounter], img => {
+
+            currImage = img
+            currImage.resize(windowWidth, windowHeight)
+
             imageCounter += 1
+        });
 
-        shouldDrawRect = false
+    } else if(state == State.drawResults_VisualizeOnly || 
+              state == State.drawResults_VisualizeW_Tracking) {
 
-        if(shouldSendData) {
+        if(currImage != null) {
+            image(currImage, 0, 0)
+        }
 
-            var dataForSend = ''
-            for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+        if(measurements != null) {
 
-                if(allData[i].includes('-----')) {
+            if(state == State.drawResults_VisualizeW_Tracking) {
+            
+                if(trackingOrigin[0] == -1)
+                    trackingOrigin = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
 
-                    ipcRenderer.send('tracking:send', 'measurements: ' + dataForSend)
-                    break
-                } else if(allData[i].includes('pose')) {
+                // console.log(pose)
+                currPose = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
 
-                    var pose = allData[i].replace('pose: ', '').split(',')
+                var x = getRelativeViewX(currPose[1])
+                var y = getRelativeViewY(currPose[0])
+                // console.log(x, y)
 
-                    if(trackingOrigin[0] == -1)
-                        trackingOrigin = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
+                fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+                stroke(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+                circle(x, y, 2)
+            }
 
-                    currPose = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
 
-                    // var x = ( (currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-                    // var y = windowHeight - ( (currPose[0] - trackingOrigin[0]) * yScl)
-                    var x = getRelativeViewX(currPose[1])
-                    var y = getRelativeViewY(currPose[0])
+            var minX = 100
+            var minY = 100
+            var boxVal = ''
+            cX = getAbsoluteViewX(cX)
+            cY = getAbsoluteViewY(cY)
 
-                    fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
-                    stroke(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
-                    circle(x, y, 2)
 
-                    ipcRenderer.send('tracking:send', allData[i])
+            measurements.split(';').forEach(function(item, index, array) {
 
-                } else if(allData[i].includes('trans')) {
+                var part1 = item.split('|')[0]
+                var part2 = item.split('|')[1]
+                
+                part1 = part1.replace('[', '').replace(']', '').split(',')
+                
+                noFill()
+                stroke(255, 255, 0, 255)
+                var x1 = parseFloat(part1[2])/2
+                var y1 = parseFloat(part1[3])/2
+                var x2 = parseFloat(part1[4])/2
+                var y2 = parseFloat(part1[5])/2
+                rect(x1, y1, x2-x1, y2-y1)
 
-                } else {
-                    if(dataForSend != '')
-                        dataForSend += '\n'
+                if(part2.length > 2) {
 
-                    dataForSend += allData[i]
+                    part2 = part2.replace('(', '').replace(')', '').replace("'", '').split(',')
+                    // console.log(part2)
 
-                    currMeasure = allData[i].split('|')
-                    if(currMeasure[1].length > 1) {
+                    var xImage = parseFloat(part2[1])/2
+                    var yImage = parseFloat(part2[2])/2
+                    var z = parseFloat(part2[5])
 
-                        currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
-                        var x = currMeasure[3].replace("'", '')
-                        var y = currMeasure[5].replace("'", '')
+                    fill(255, 255, 0, 64)
+                    rect(x1, y1, x2-x1, y2-y1)
 
-                        // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-                        // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
+
+                    if(state == State.drawResults_VisualizeW_Tracking) {
+
+                        // console.log(part2)
+                        var x = part2[3].replace("'", '')
+                        var y = part2[5].replace("'", '')
 
                         x = getRelativeViewX(parseFloat(x) + currPose[1])
                         y = getRelativeViewY(currPose[0] + parseFloat(y))
@@ -250,92 +335,204 @@ function draw() {
                         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
                         stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
                         circle(x, y, 2)
-                    }
-                } 
-            }
-        }
-    }  
-    
-    if( state != State.pause && imageCounter < listOfData.length - 1 ) {
-
-        loadImage('../' + listOfData[imageCounter], img => {
-            img.resize(windowWidth, windowHeight)
-            image(img, 0, 0);
-            if(state == State.oneFrame || state == State.reloadFrame)
-                state = State.pause
 
 
-            if(cX != 0 && cY != 0) {
-
-                // cX = (cX * xScl) + (1.5 * windowWidth)
-                // cY = windowHeight - (cY * yScl)
-                cX = getAbsoluteViewX(cX)
-                cY = getAbsoluteViewY(cY)
-
-                minX = 100
-                minY = 100
-                boxVal = ''
-
-                for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
-
-                    if(allData[i].includes('-----')) {
-                        break
-                    } else if(allData[i].includes('pose')) {
-
-                    } else if(allData[i].includes('trans')) {
-
-                    } else {
-
-                        currMeasure = allData[i].split('|')
-                        if(currMeasure[1].length > 1) {
-
-                            currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
-                            var x = currMeasure[3].replace("'", '')
-                            var y = currMeasure[5].replace("'", '')
-
-                            // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-                            // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
-
-                            x = getRelativeViewX(parseFloat(x) + currPose[1])
-                            y = getRelativeViewY(currPose[0] + parseFloat(y))
-
-                            if( abs(cX - x) < minX && abs(cY - y) < minY ) {
-                                minX = abs(cX - x)
-                                minY = abs(cY - y)
-                                boxVal = allData[i].split('|')[0]
-                            }
+                        if( abs(cX - x) < minX && abs(cY - y) < minY ) {
+                            minX = abs(cX - x)
+                            minY = abs(cY - y)
+                            boxVal = item.split('|')[0]
                         }
-                    } 
+
+                    }
+
+
+                    // stroke(255, 255, 0, 255)
+                    // fill(255, 255, 0, 255)
+                    // circle(xImage, yImage, 7)
                 }
+            })
 
+            if( sqrt( sq(minX) + sq(minY) ) < 7 ) {   
                 
-                if( sqrt( sq(minX) + sq(minY) ) < 7 ) {   
-                    boxVal = boxVal.replace('[', '').replace(']', '')
-                    var part1 = boxVal.split(',')
-                    var x1 = part1[2]/2
-                    var y1 = part1[3]/2
-                    var x2 = part1[4]/2
-                    var y2 = part1[5]/2
-                    stroke(255, 255, 255)
-                    fill(255, 255, 255, 128)
-                    rect(x1, y1, x2-x1, y2-y1)
-                } else 
-                    console.log('min ', minX, minY)
-
-                fill(0, 0, 255, 128)
-                stroke(0, 0, 255, 128)
-                circle(cX, cY, 2)
-            }
-
-
-            if(shouldDrawRect) {
+                boxVal = boxVal.replace('[', '').replace(']', '')
+                var part1 = boxVal.split(',')
+                var x1 = part1[2]/2
+                var y1 = part1[3]/2
+                var x2 = part1[4]/2
+                var y2 = part1[5]/2
                 stroke(255, 255, 255)
                 fill(255, 255, 255, 128)
-                rect(rectX1, rectY1, rectX2-rectX1, rectY2-rectY1)
-                shouldDrawRect = false
-            }
-        });
+                rect(x1, y1, x2-x1, y2-y1)
+            } else 
+                console.log('min ', minX, minY)
+
+            fill(0, 0, 255, 255)
+            stroke(0, 0, 255, 255)
+            circle(cX, cY, 2)
+
+
+
+        }
+
+        if(state == State.drawResults_VisualizeOnly)
+            state = State.sendImageName_VisualizeOnly
+        else
+            state = State.sendImageName_VisualizeW_Tracking
+
     }
+
+
+    // if(imageCounter >= listOfData.length - 1) {
+    //     ipcRenderer.send('tracking:connection:close', 'EOF')
+    //     noLoop()
+    // }
+
+    // if( ( state == State.running || state == State.oneFrame ) && imageCounter < listOfData.length - 1) {
+
+    //     if(state == State.running)
+    //         imageCounter += 1
+
+    //     shouldDrawRect = false
+
+    //     if(shouldSendData) {
+
+    //         var dataForSend = ''
+    //         for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+
+    //             if(allData[i].includes('-----')) {
+
+    //                 ipcRenderer.send('tracking:send', 'measurements: ' + dataForSend)
+    //                 break
+    //             } else if(allData[i].includes('pose')) {
+
+    //                 var pose = allData[i].replace('pose: ', '').split(',')
+
+    //                 if(trackingOrigin[0] == -1)
+    //                     trackingOrigin = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
+
+    //                 currPose = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
+
+    //                 // var x = ( (currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+    //                 // var y = windowHeight - ( (currPose[0] - trackingOrigin[0]) * yScl)
+    //                 var x = getRelativeViewX(currPose[1])
+    //                 var y = getRelativeViewY(currPose[0])
+
+    //                 fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+    //                 stroke(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
+    //                 circle(x, y, 2)
+
+    //                 ipcRenderer.send('tracking:send', allData[i])
+
+    //             } else if(allData[i].includes('trans')) {
+
+    //             } else {
+    //                 if(dataForSend != '')
+    //                     dataForSend += '\n'
+
+    //                 dataForSend += allData[i]
+
+    //                 currMeasure = allData[i].split('|')
+    //                 if(currMeasure[1].length > 1) {
+
+    //                     currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
+    //                     var x = currMeasure[3].replace("'", '')
+    //                     var y = currMeasure[5].replace("'", '')
+
+    //                     // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+    //                     // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
+
+    //                     x = getRelativeViewX(parseFloat(x) + currPose[1])
+    //                     y = getRelativeViewY(currPose[0] + parseFloat(y))
+
+    //                     fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //                     stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //                     circle(x, y, 2)
+    //                 }
+    //             } 
+    //         }
+    //     }
+    // }  
+    
+    // if( state != State.pause && imageCounter < listOfData.length - 1 ) {
+
+    //     loadImage('../' + listOfData[imageCounter], img => {
+    //         img.resize(windowWidth, windowHeight)
+    //         image(img, 0, 0);
+    //         if(state == State.oneFrame || state == State.reloadFrame)
+    //             state = State.pause
+
+
+    //         if(cX != 0 && cY != 0) {
+
+    //             // cX = (cX * xScl) + (1.5 * windowWidth)
+    //             // cY = windowHeight - (cY * yScl)
+    //             cX = getAbsoluteViewX(cX)
+    //             cY = getAbsoluteViewY(cY)
+
+    //             minX = 100
+    //             minY = 100
+    //             boxVal = ''
+
+    //             for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
+
+    //                 if(allData[i].includes('-----')) {
+    //                     break
+    //                 } else if(allData[i].includes('pose')) {
+
+    //                 } else if(allData[i].includes('trans')) {
+
+    //                 } else {
+
+    //                     currMeasure = allData[i].split('|')
+    //                     if(currMeasure[1].length > 1) {
+
+    //                         currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
+    //                         var x = currMeasure[3].replace("'", '')
+    //                         var y = currMeasure[5].replace("'", '')
+
+    //                         // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
+    //                         // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
+
+    //                         x = getRelativeViewX(parseFloat(x) + currPose[1])
+    //                         y = getRelativeViewY(currPose[0] + parseFloat(y))
+
+    //                         if( abs(cX - x) < minX && abs(cY - y) < minY ) {
+    //                             minX = abs(cX - x)
+    //                             minY = abs(cY - y)
+    //                             boxVal = allData[i].split('|')[0]
+    //                         }
+    //                     }
+    //                 } 
+    //             }
+
+                
+    //             if( sqrt( sq(minX) + sq(minY) ) < 7 ) {   
+    //                 boxVal = boxVal.replace('[', '').replace(']', '')
+    //                 var part1 = boxVal.split(',')
+    //                 var x1 = part1[2]/2
+    //                 var y1 = part1[3]/2
+    //                 var x2 = part1[4]/2
+    //                 var y2 = part1[5]/2
+    //                 stroke(255, 255, 255)
+    //                 fill(255, 255, 255, 128)
+    //                 rect(x1, y1, x2-x1, y2-y1)
+    //             } else 
+    //                 console.log('min ', minX, minY)
+
+    //             fill(0, 0, 255, 128)
+    //             stroke(0, 0, 255, 128)
+    //             circle(cX, cY, 2)
+    //         }
+
+
+    //         if(shouldDrawRect) {
+    //             stroke(255, 255, 255)
+    //             fill(255, 255, 255, 128)
+    //             rect(rectX1, rectY1, rectX2-rectX1, rectY2-rectY1)
+    //             shouldDrawRect = false
+    //         }
+    //     });
+    // }
 
 
 }
@@ -350,42 +547,92 @@ function mouseClicked() {
 
     console.log(mouseX, mouseY, imageCounter)
 
-    for(var i = indices[imageCounter] + 3; i < allData.length; i++) {
+    if(measurements == null)
+        return false
 
-        if(allData[i].includes('-----'))
-            break
+    measurements.split(';').forEach(function(item, index, array) {
 
-        
-        var currData = allData[i].replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        var part1 = item.split('|')[0]
+        var part2 = item.split('|')[1]
+        // console.log(values)
+        part1 = part1.replace('[', '').replace(']', '').split(',')
 
-        currData = currData.split('|')
+        console.log(item)
 
-        if(currData[1].length > 1) {
+        if(part2.length > 1) {
 
-            var part1 = currData[0].split(',')
+            // console.log(item)
 
-            currX1 = part1[2]/2
-            currY1 = part1[3]/2
-            currX2 = part1[4]/2
-            currY2 = part1[5]/2
+            var currX1 = part1[2]/2
+            var currY1 = part1[3]/2
+            var currX2 = part1[4]/2
+            var currY2 = part1[5]/2
+
+            // console.log(currX1, currY1, currX2, currY2)
 
             if( currX1 < mouseX && currY1 < mouseY &&
                 currX2 > mouseX && currY2 > mouseY ) {
 
-                    state = State.reloadFrame
-                    shouldDrawRect = true
-                    shouldSendData = true
-                    
-                    ipcRenderer.send('tracking:send', 'prior: ' + allData[i])
+                console.log(part1)
+                console.log(currX1, currY1, currX2, currY2)
 
-                    rectX1 = currX1
-                    rectY1 = currY1
-                    rectX2 = currX2
-                    rectY2 = currY2
+                fill(255, 255, 255, 128)
+                stroke(255, 255, 255, 255)
+                rect(currX1, currY1, currX2-currX1, currY2-currY1)
+
+                state = State.pause_Tracking
+                ipcRenderer.send('tracking:tracking:send', 'prior: ' + item)
+//                 shouldDrawRect = true
+//                 shouldSendData = true
+
+                rectX1 = currX1
+                rectY1 = currY1
+                rectX2 = currX2
+                rectY2 = currY2
+
             }
         }
 
-    }
+
+    })
+
+
+    // for(var i = indices[imageCounter] + 3; i < allData.length; i++) {
+
+    //     if(allData[i].includes('-----'))
+    //         break
+
+        
+    //     var currData = allData[i].replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+
+    //     currData = currData.split('|')
+
+    //     if(currData[1].length > 1) {
+
+    //         var part1 = currData[0].split(',')
+
+    //         currX1 = part1[2]/2
+    //         currY1 = part1[3]/2
+    //         currX2 = part1[4]/2
+    //         currY2 = part1[5]/2
+
+    //         if( currX1 < mouseX && currY1 < mouseY &&
+    //             currX2 > mouseX && currY2 > mouseY ) {
+
+    //                 state = State.reloadFrame
+    //                 shouldDrawRect = true
+    //                 shouldSendData = true
+                    
+    //                 ipcRenderer.send('tracking:send', 'prior: ' + allData[i])
+
+    //                 rectX1 = currX1
+    //                 rectY1 = currY1
+    //                 rectX2 = currX2
+    //                 rectY2 = currY2
+    //         }
+    //     }
+
+    // }
 
 
 
