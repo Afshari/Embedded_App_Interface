@@ -1,5 +1,58 @@
 <%- include('./import_above_content.ejs', { Title: "Detectron & Tracking with JPDA", PageAddr: 'detectron_tracking' } ) %>
 
+<!-- INLINE FORM ELELEMNTS -->
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Servers Details</h4>
+        <div class="row">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form" class="col-sm-6">
+                    <div class="form-group">
+                        <label class="sr-only" for="detectron_ip">Detectron IP</label>
+                        <input type="email" class="form-control" id="detectron_ip" placeholder="Detectron IP">
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="detectron_port">Detectron Port</label>
+                        <input class="form-control" id="detectron_port" placeholder="Detectron Port">
+                    </div>
+                    <button type="submit" class="btn btn-theme" id="btnDetectronConnect">Connect</button>
+                    <span id="span_detectron_status" class="badge bg-warning" style="margin-left: 50px;">Not Connected</span>
+                </form>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form">
+                    <div class="form-group">
+                        <label class="sr-only" for="jpda_ip">JPDA IP</label>
+                        <input type="email" class="form-control" id="jpda_ip" placeholder="JPDA IP">
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="jpda_port">JPDA Port</label>
+                        <input class="form-control" id="jpda_port" placeholder="JPDA Port">
+                    </div>
+                    <button type="submit" class="btn btn-theme" id="btnJPDAConnect">Connect</button>
+                    <span id="span_jpda_status" class="badge bg-warning" style="margin-left: 50px;">Not Connected</span>
+                </form>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="form-group">
+                <div class="col-lg-6">
+                    <label  for="sel_environment">Environment</label>
+                    <select id="sel_environment" class="form-control">
+                            <option value="cars_9" >Environment 1</option>
+                            <option value="cars_10">Environment 2</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
 
 <!-- <h3 id='statusH3'>Status: Running</h3> -->
 <!-- <input type="button" value="Click Me"></input> -->
@@ -18,8 +71,8 @@
 
 <script type="text/javascript">
 
-const electron = require('electron');
-const { ipcRenderer } = electron;
+// const electron = require('electron');
+// const { ipcRenderer } = electron;
 let fs = require('fs')
 var Enum = require('enum')
 
@@ -51,6 +104,7 @@ var lastState = State.pause
 
 const windowWidth = 800;
 const windowHeight = 450;
+var selectedEnvironment
 
 
 function setStatus(status) {
@@ -135,6 +189,34 @@ $(document).ready(function() {
         return false
     })
 
+    $("#btnDetectronConnect").click(function(e) {
+
+        var detectron_ip = $("#detectron_ip").val()
+        var detectron_port = $("#detectron_port").val()
+
+        ipcRenderer.send('tracking:connect:detectron', detectron_ip, detectron_port)
+    })
+
+    $("#btnJPDAConnect").click(function(e) {
+
+        var jpda_ip = $("#jpda_ip").val()
+        var jpda_port = $("#jpda_port").val()
+
+        ipcRenderer.send('tracking:connect:jpda', jpda_ip, jpda_port)  
+    })
+
+    $('#sel_environment').on('change', function (e) {
+        var optionSelected = $("option:selected", this);
+        var valueSelected = this.value;
+
+        selectedEnvironment = valueSelected
+        // console.log(optionSelected)
+        // console.log(valueSelected)
+    });
+
+    selectedEnvironment = $('#sel_environment').find("option:selected").val()
+    // console.log(selectedEnvironment)
+
 })
 
 
@@ -146,7 +228,25 @@ const yScl = 3
 var measurements = null
 var pose = null
 
-ipcRenderer.on('tracking:vision:data:get', function (evt, message) {
+
+ipcRenderer.on('tracking:connection:status:detectron', function (event, status) {
+
+    if(status == 'connected') {
+        $('#span_detectron_status').text('connected')
+        $('#span_detectron_status').removeClass("bg-warning").addClass("bg-info")
+    }
+
+})
+
+ipcRenderer.on('tracking:connection:status:jpda', function (event, status) {
+
+    if(status == 'connected') {
+        $('#span_jpda_status').text('connected')
+        $('#span_jpda_status').removeClass("bg-warning").addClass("bg-info")
+    }
+})
+
+ipcRenderer.on('tracking:vision:data:get', function (event, message) {
 
     // console.log(message)
 
@@ -230,7 +330,10 @@ function setup() {
     imageNames = JSON.parse(data);
 
     console.log(imageNames.cars_9.length);
+    // console.log(imageNames['cars_9'].length);
     console.log(imageNames.cars_9[0]);
+    // console.log(imageNames['cars_9'][0]);
+    // noLoop()
 
     frameRate(10)
 }
@@ -244,16 +347,16 @@ function draw() {
     // console.log(state)
 
     if( (state == State.sendImageName_VisualizeOnly || state == State.sendImageName_VisualizeW_Tracking) && 
-        imageCounter < imageNames.cars_9.length) {
+        imageCounter < imageNames[selectedEnvironment].length) {
 
         if(state == State.sendImageName_VisualizeOnly)
             state = State.waitForMeasurements_VisualizeOnly
         else
             state = State.waitForMeasurements_VisualizeW_Tracking
 
-        ipcRenderer.send('tracking:vision:send', imageNames.cars_9[imageCounter])
+        ipcRenderer.send('tracking:vision:send', imageNames[selectedEnvironment][imageCounter])
         
-        loadImage('../data/environment_images/' + imageNames.cars_9[imageCounter], img => {
+        loadImage('../data/environment_images/' + imageNames[selectedEnvironment][imageCounter], img => {
 
             currImage = img
             currImage.resize(windowWidth, windowHeight)
@@ -303,7 +406,14 @@ function draw() {
                 part1 = part1.replace('[', '').replace(']', '').split(',')
                 
                 noFill()
-                stroke(255, 255, 0, 255)
+                if(part1[0] == 'car')
+                    stroke(255, 255, 0, 255)
+                else if(part1[0] == 'person')
+                    stroke(255, 0, 0, 255)
+                else
+                    stroke(0, 255, 0, 255)
+
+
                 var x1 = parseFloat(part1[2])/2
                 var y1 = parseFloat(part1[3])/2
                 var x2 = parseFloat(part1[4])/2
@@ -319,7 +429,13 @@ function draw() {
                     var yImage = parseFloat(part2[2])/2
                     var z = parseFloat(part2[5])
 
-                    fill(255, 255, 0, 64)
+                    if(part1[0] == 'car')
+                        fill(255, 255, 0, 64)
+                    else if(part1[0] == 'person')
+                        fill(255, 0, 0, 64)
+                    else
+                        fill(0, 255, 0, 64)
+
                     rect(x1, y1, x2-x1, y2-y1)
 
 
@@ -370,8 +486,6 @@ function draw() {
             stroke(0, 0, 255, 255)
             circle(cX, cY, 2)
 
-
-
         }
 
         if(state == State.drawResults_VisualizeOnly)
@@ -382,159 +496,6 @@ function draw() {
     }
 
 
-    // if(imageCounter >= listOfData.length - 1) {
-    //     ipcRenderer.send('tracking:connection:close', 'EOF')
-    //     noLoop()
-    // }
-
-    // if( ( state == State.running || state == State.oneFrame ) && imageCounter < listOfData.length - 1) {
-
-    //     if(state == State.running)
-    //         imageCounter += 1
-
-    //     shouldDrawRect = false
-
-    //     if(shouldSendData) {
-
-    //         var dataForSend = ''
-    //         for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
-
-    //             if(allData[i].includes('-----')) {
-
-    //                 ipcRenderer.send('tracking:send', 'measurements: ' + dataForSend)
-    //                 break
-    //             } else if(allData[i].includes('pose')) {
-
-    //                 var pose = allData[i].replace('pose: ', '').split(',')
-
-    //                 if(trackingOrigin[0] == -1)
-    //                     trackingOrigin = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
-
-    //                 currPose = [ parseFloat(pose[0]), parseFloat(pose[1]) ]
-
-    //                 // var x = ( (currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-    //                 // var y = windowHeight - ( (currPose[0] - trackingOrigin[0]) * yScl)
-    //                 var x = getRelativeViewX(currPose[1])
-    //                 var y = getRelativeViewY(currPose[0])
-
-    //                 fill(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
-    //                 stroke(cameraColor[0], cameraColor[1], cameraColor[2], cameraColor[3])
-    //                 circle(x, y, 2)
-
-    //                 ipcRenderer.send('tracking:send', allData[i])
-
-    //             } else if(allData[i].includes('trans')) {
-
-    //             } else {
-    //                 if(dataForSend != '')
-    //                     dataForSend += '\n'
-
-    //                 dataForSend += allData[i]
-
-    //                 currMeasure = allData[i].split('|')
-    //                 if(currMeasure[1].length > 1) {
-
-    //                     currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
-    //                     var x = currMeasure[3].replace("'", '')
-    //                     var y = currMeasure[5].replace("'", '')
-
-    //                     // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-    //                     // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
-
-    //                     x = getRelativeViewX(parseFloat(x) + currPose[1])
-    //                     y = getRelativeViewY(currPose[0] + parseFloat(y))
-
-    //                     fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-    //                     stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-    //                     circle(x, y, 2)
-    //                 }
-    //             } 
-    //         }
-    //     }
-    // }  
-    
-    // if( state != State.pause && imageCounter < listOfData.length - 1 ) {
-
-    //     loadImage('../' + listOfData[imageCounter], img => {
-    //         img.resize(windowWidth, windowHeight)
-    //         image(img, 0, 0);
-    //         if(state == State.oneFrame || state == State.reloadFrame)
-    //             state = State.pause
-
-
-    //         if(cX != 0 && cY != 0) {
-
-    //             // cX = (cX * xScl) + (1.5 * windowWidth)
-    //             // cY = windowHeight - (cY * yScl)
-    //             cX = getAbsoluteViewX(cX)
-    //             cY = getAbsoluteViewY(cY)
-
-    //             minX = 100
-    //             minY = 100
-    //             boxVal = ''
-
-    //             for(var i = indices[imageCounter] + 1; i < allData.length; i++) {
-
-    //                 if(allData[i].includes('-----')) {
-    //                     break
-    //                 } else if(allData[i].includes('pose')) {
-
-    //                 } else if(allData[i].includes('trans')) {
-
-    //                 } else {
-
-    //                     currMeasure = allData[i].split('|')
-    //                     if(currMeasure[1].length > 1) {
-
-    //                         currMeasure = currMeasure[1].replace('(', '').replace(')', '').split(',')
-    //                         var x = currMeasure[3].replace("'", '')
-    //                         var y = currMeasure[5].replace("'", '')
-
-    //                         // x = ( (parseFloat(x) + currPose[1] - trackingOrigin[1] ) * xScl) + (1.5 * windowWidth)
-    //                         // y = windowHeight - ( (currPose[0] - trackingOrigin[0] + parseFloat(y)) * yScl)
-
-    //                         x = getRelativeViewX(parseFloat(x) + currPose[1])
-    //                         y = getRelativeViewY(currPose[0] + parseFloat(y))
-
-    //                         if( abs(cX - x) < minX && abs(cY - y) < minY ) {
-    //                             minX = abs(cX - x)
-    //                             minY = abs(cY - y)
-    //                             boxVal = allData[i].split('|')[0]
-    //                         }
-    //                     }
-    //                 } 
-    //             }
-
-                
-    //             if( sqrt( sq(minX) + sq(minY) ) < 7 ) {   
-    //                 boxVal = boxVal.replace('[', '').replace(']', '')
-    //                 var part1 = boxVal.split(',')
-    //                 var x1 = part1[2]/2
-    //                 var y1 = part1[3]/2
-    //                 var x2 = part1[4]/2
-    //                 var y2 = part1[5]/2
-    //                 stroke(255, 255, 255)
-    //                 fill(255, 255, 255, 128)
-    //                 rect(x1, y1, x2-x1, y2-y1)
-    //             } else 
-    //                 console.log('min ', minX, minY)
-
-    //             fill(0, 0, 255, 128)
-    //             stroke(0, 0, 255, 128)
-    //             circle(cX, cY, 2)
-    //         }
-
-
-    //         if(shouldDrawRect) {
-    //             stroke(255, 255, 255)
-    //             fill(255, 255, 255, 128)
-    //             rect(rectX1, rectY1, rectX2-rectX1, rectY2-rectY1)
-    //             shouldDrawRect = false
-    //         }
-    //     });
-    // }
-
-
 }
 
 function mouseClicked() {
@@ -542,7 +503,7 @@ function mouseClicked() {
     if(state != State.pause)
         return false
 
-    if( mouseX < 0 && mouseY < 0 && mouseX > windowWidth && mouseY > windowHeight )
+    if( mouseX < 0 || mouseY < 0 || mouseX > windowWidth || mouseY > windowHeight )
         return false
 
     console.log(mouseX, mouseY, imageCounter)
@@ -595,45 +556,6 @@ function mouseClicked() {
 
 
     })
-
-
-    // for(var i = indices[imageCounter] + 3; i < allData.length; i++) {
-
-    //     if(allData[i].includes('-----'))
-    //         break
-
-        
-    //     var currData = allData[i].replace('[', '').replace(']', '').replace('(', '').replace(')', '')
-
-    //     currData = currData.split('|')
-
-    //     if(currData[1].length > 1) {
-
-    //         var part1 = currData[0].split(',')
-
-    //         currX1 = part1[2]/2
-    //         currY1 = part1[3]/2
-    //         currX2 = part1[4]/2
-    //         currY2 = part1[5]/2
-
-    //         if( currX1 < mouseX && currY1 < mouseY &&
-    //             currX2 > mouseX && currY2 > mouseY ) {
-
-    //                 state = State.reloadFrame
-    //                 shouldDrawRect = true
-    //                 shouldSendData = true
-                    
-    //                 ipcRenderer.send('tracking:send', 'prior: ' + allData[i])
-
-    //                 rectX1 = currX1
-    //                 rectY1 = currY1
-    //                 rectX2 = currX2
-    //                 rectY2 = currY2
-    //         }
-    //     }
-
-    // }
-
 
 
     return false;

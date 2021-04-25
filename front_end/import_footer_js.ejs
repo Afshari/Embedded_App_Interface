@@ -21,17 +21,40 @@
   <script src="lib/chart-master/Chart.js"></script>
 <% } %>
 
-<script>
+<script type="text/javascript">
 
-	const remote = require('electron').remote
-	let win = remote.getCurrentWindow()
+	// const remote = require('electron').remote
+	// let win = remote.getCurrentWindow()
 
 	// var renderChartJS = <%= (typeof renderChartJS !== 'undefined') ? renderChartJS : false %>;
 	// console.log(renderChartJS);
 
-	function navigateTo(page) {
-		if(page == "chart")
-			win.loadFile('chart.ejs');
-	}
+	// function navigateTo(page) {
+	// 	if(page == "chart")
+	// 		win.loadFile('chart.ejs');
+	// }
+
+</script>
+
+
+
+<script type="text/javascript">
+
+  const electron = require('electron');
+  const { ipcRenderer } = electron;
+
+  $(document).ready(function() {
+
+      $("a.sidebar_item").click(function(){
+
+        // console.log("Clicked")
+        var href = $(this).attr('href');
+        ipcRenderer.send('menu:page:change', href)
+        // console.log(href);
+
+      })
+
+  })
+
 
 </script>

@@ -8,24 +8,28 @@ var linearAlgebra = require('linear-algebra')(),
 					Vector = linearAlgebra.Vector,
 					Matrix = linearAlgebra.Matrix;
 
-const sot = require('./sot')
-const detectron_tracking = require('./detectron_tracking')
+const sot = require('./sot');
+const rls = require('./rls');
+const detectron_tracking = require('./detectron_tracking');
+
+
+let win;
+var lastPage = '';
 
 
 function createWindow() {
-	const win = new BrowserWindow({
+	win = new BrowserWindow({
 		webPreferences: {
 				enableRemoteModule: true,
 			nodeIntegration: true
 		}
 	})
-	win.maximize()
-	// win.loadFile('front_end/sot.ejs')
-	win.loadFile('front_end/detectron_tracking.ejs')
-//   sot.init(win)
-	detectron_tracking.init(win)
 
-
+	win.maximize();
+	
+	win.loadFile('front_end/detectron_tracking.ejs');
+	lastPage = 'detectron_tracking.ejs';
+	detectron_tracking.init(win);
 
 }
 
@@ -35,6 +39,42 @@ var outputData = [];
 var dataIndex = 0;
 
 let intervalObj;
+
+ipcMain.on("menu:page:change", function(event, addr) {
+
+	console.log(addr);
+
+	if(lastPage === 'rls.ejs') {
+
+		rls.deactivate();
+
+	} else if(lastPage == 'sot.ejs') {
+
+		sot.deactivate();
+
+	} else if(lastPage === 'detectron_tracking.ejs') {
+
+		detectron_tracking.deactivate();
+
+	}
+
+	if(addr === 'rls.ejs') {
+
+		rls.init(win)
+		win.loadFile('front_end/rls.ejs');
+
+	} else if(addr === 'sot.ejs') {
+
+		sot.init(win);
+		win.loadFile('front_end/sot.ejs');
+
+	} else if(addr === 'detectron_tracking.ejs') {
+
+		detectron_tracking.init(win);
+		win.loadFile('front_end/detectron_tracking.ejs');
+
+	}
+})
 
 ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
 
@@ -113,76 +153,13 @@ ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
 });
 
 ipcMain.on('uart:reload', (event) => {
+	
 	SerialPort.list().then(function(ports){
+		// console.log(ports)
 		event.reply('uart:data', ports);
 	});
 });
 
-
-ipcMain.on('rls:ready:receive', (event, uart) => {
-
-	if ( typeof port === 'undefined' ) {
-		port = new SerialPort(uart, { baudRate: 115200 });
-
-		port.on('error', function(err) {
-			console.log('Error: ', err.message);
-		});
-		port.on('data', function(data){
-			// console.log("Received Data: ", data.toString());
-			let result = data.toString().split(" ");
-			event.reply('rls:x:data', [result[0], result[1]]);
-		});
-	}
-	function sendCmdRLS(data) {
-		port.write(data, (err) => {
-			if (err) console.log('Error on write: ', err.message);
-			// console.log("Sending: ", data);
-		});
-	}
-	let x = new Matrix([[10], [5]]);
-	let xhat = new Matrix([[8], [7]]);
-	let R = new Matrix([[ Math.sqrt(0.1) ]]);
-	var k = 1;
-
-	// console.log("x: ", x);
-	// console.log("xhat: ", xhat);
-	// console.log("R: ", R);
-	// H = np.array([[1, 0.99**(k-1)]])
-	var H = new Matrix([[1, Math.pow(0.99, k-1)]]);
-	k += 1;
-	//  y = H @ x + np.sqrt(R) * np.random.randn()
-	let rnd = new Matrix([[ Math.random() ]]);
-	var y = H.dot(x).plus( R.dot(rnd) );
-	console.log("H: ", H);
-	console.log("y: ", y);
-
-	// event.reply('rls:x:data', [10, 20]);
-	strH = H.data[0][1].toFixed(4).toString();
-	strY = y.data[0][0].toFixed(4).padStart(7, "0");
-	sendCmdRLS(`${strH} ${strY}`);
-
-	var timeCounter = 0;
-	let interval = setInterval(() => {
-
-		H = new Matrix([[1, Math.pow(0.99, k-1)]]);
-		k += 1;
-		rnd = new Matrix([[ Math.random() ]]);
-		y = H.dot(x).plus( R.dot(rnd) );
-
-		strH = H.data[0][1].toFixed(4).toString();
-		strY = y.data[0][0].toFixed(4).padStart(7, "0");
-		// console.log(`H: ${strH} -- y: ${strY}`);
-
-		// console.log(`${strH} ${strY}`);
-		sendCmdRLS(`${strH} ${strY}`);
-
-		// event.reply('rls:x:data', [10, 20]);
-		timeCounter += 1;
-		if(timeCounter > 100)
-			clearInterval(interval);
-	}, 1000);
-
-});
 
 
 app.whenReady().then(function() {
@@ -191,7 +168,8 @@ app.whenReady().then(function() {
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') {
-	detectron_tracking.exitApp()
+	detectron_tracking.deactivate();
+	rls.deactivate();
     app.quit()
   }
 })

@@ -4,20 +4,25 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const net = require('net')
 
 let mainWindow
-var isActive = false
+var _isActive = false;
+var _isVisionConnected = false;
+var _isTrackingConnected = false;
 
 module.exports = {
     init,
-    exitApp
+    isActive,
+    deactivate
 }
 
 function init(win) {
 
     mainWindow = win
-    const timeoutObj = setTimeout(function () {
+    _isActive = true
+
+    // const timeoutObj = setTimeout(function () {
         
-        connect()
-        isActive = true
+        // connect()
+
 
         // listOfData = readDataFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
         // prior = getPrior('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
@@ -27,10 +32,10 @@ function init(win) {
 
         // sendPrior(prior)
 
-        sendDataVision("Let's Start")
-        clearTimeout(timeoutObj)
+        // sendDataVision("Let's Start")
+        // clearTimeout(timeoutObj)
 
-    }, 2000)
+    // }, 2000)
 }
 
 function sendDataVision(data) {
@@ -43,17 +48,34 @@ function sendDataTracking(data) {
     clientTracking.write(data)
 }
 
-function exitApp() {
 
-    if(isActive == true) {
+function isActive() {
+    return _isActive;
+}
 
-        sendDataVision('EOF')
-        sendDataTracking('EOF')
-        clientVision.end()
-        clientTracking.end()
-        clientVision.destroy()
-        clientTracking.destroy()
+function deactivate() {
+
+    if(_isActive == true) {
+        
+        _isActive = false;
     }
+
+    if(_isVisionConnected == true) {
+
+        _isVisionConnected = false;
+        sendDataVision('EOF');
+        clientVision.end();
+        clientVision.destroy();
+    }
+
+    if(_isTrackingConnected == true) {
+
+        _isTrackingConnected = false;
+        sendDataTracking('EOF');
+        clientTracking.end();
+        clientTracking.destroy();
+    }
+
 }
 
 ipcMain.on('tracking:vision:send', (event, data) => {
@@ -72,24 +94,36 @@ var clientTracking = new net.Socket()
 
 ipcMain.on('tracking:connection:close', (event) => {
 
-    sendDataVision('EOF')
-    sendDataTracking('EOF')
-    clientVision.end()
-    clientTracking.end()
-    clientVision.destroy()
-    clientTracking.destroy()
+    deactivate();
 })
 
-function connect() {
+// function connect() {
 
-    clientVision.connect(6070, '127.0.0.1', function() {
-        console.log('Connected to Vision');
-    })
+//     clientVision.connect(6070, '127.0.0.1', function() {
+//         console.log('Connected to Vision');
+//     })
 
-    clientTracking.connect(6060, '127.0.0.1', function() {
-        console.log('Connected to Tracking');
+//     clientTracking.connect(6060, '127.0.0.1', function() {
+//         console.log('Connected to Tracking');
+//     })
+// }
+
+
+ipcMain.on('tracking:connect:detectron', (event, ip, port) => {
+
+    clientVision.connect(port, ip, function() {
+        _isVisionConnected = true;
+        mainWindow.webContents.send('tracking:connection:status:detectron', 'connected')
     })
-}
+})
+
+ipcMain.on('tracking:connect:jpda', (event, ip, port) => {
+
+    clientTracking.connect(port, ip, function() {
+        _isTrackingConnected = true;
+        mainWindow.webContents.send('tracking:connection:status:jpda', 'connected')
+    })
+})
 
 clientVision.on('data', function(data) {
 
@@ -104,6 +138,7 @@ clientTracking.on('data', function(data) {
 
 
 clientVision.on('close', function() {
+    _isVisionConnected = false;
 	console.log('Vision Connection closed');
 });
 
@@ -112,6 +147,7 @@ clientVision.on('error', function(err) {
 });
 
 clientTracking.on('close', function() {
+    _isTrackingConnected = false;
 	console.log('Tracking Connection closed');
 });
 

@@ -95,8 +95,8 @@
 
 <script type="text/javascript">
 
-	const electron = require('electron');
-	const { ipcRenderer } = electron;
+	// const electron = require('electron');
+	// const { ipcRenderer } = electron;
 	var mathjaxHelper = require('mathjax-electron')
 
 
@@ -160,6 +160,7 @@
 
 		// Load UART on Reload Button Click
 		$("#reloadUart").click( (event) => {
+			// console.log(event)
             ipcRenderer.send('uart:reload');
         });
 

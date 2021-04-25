@@ -9,7 +9,9 @@ let mainWindow;
 module.exports = {
     init,
     readDataFile,
-    connect
+    connect,
+    isActive,
+    deactivate
 }
 
 let listOfData
@@ -17,10 +19,12 @@ var dataCounter = 0
 let prior
 let listOfGroundTruth
 var isAc
+var _isActive = false;
 
 function init(win) {
 
     mainWindow = win
+
     const timeoutObj = setTimeout(function () {
         
         // connect()
@@ -33,7 +37,7 @@ function init(win) {
 
         // sendPrior(prior)
         
-
+        _isActive = true;
         clearTimeout(timeoutObj)
 
     }, 2000)
@@ -134,6 +138,15 @@ function readGroundTruthFile(path) {
     return listOfData;
 }
 
+function isActive() {
+
+    return _isActive;
+}
+
+function deactivate() {
+
+    _isActive = true;
+}
 
 var client = new net.Socket();
 
@@ -158,6 +171,7 @@ client.on('data', function(data) {
         console.log("State 1 Finished")
         
         sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt'])
+
     } else {
 
         data = data.toString()
