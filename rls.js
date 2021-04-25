@@ -12,6 +12,8 @@ var linearAlgebra = require('linear-algebra')(),     // initialise it
 let mainWindow
 var _isActive = false
 let port;
+let intervalObj;
+
 
 module.exports = {
 	init,
@@ -19,7 +21,6 @@ module.exports = {
 	deactivate
 }					
 
-let intervalObj;
 
 function init(win) {
 

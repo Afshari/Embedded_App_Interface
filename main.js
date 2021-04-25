@@ -10,6 +10,7 @@ var linearAlgebra = require('linear-algebra')(),
 
 const sot = require('./sot');
 const rls = require('./rls');
+const lite_ids = require('./lite_ids');
 const detectron_tracking = require('./detectron_tracking');
 
 
@@ -73,84 +74,94 @@ ipcMain.on("menu:page:change", function(event, addr) {
 		detectron_tracking.init(win);
 		win.loadFile('front_end/detectron_tracking.ejs');
 
+	} else if(addr === 'lite_ids.ejs') {
+
+		lite_ids.init(win);
+		win.loadFile('front_end/lite_ids.ejs');
+
 	}
+
+	lastPage = addr;
+
 })
 
-ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
+// ipcMain.on('data:submit', (event, input_path, output_path, uart) => {
 
-	if ( typeof port === 'undefined' ) {
-		port = new SerialPort(uart, { baudRate: 115200 });
+// 	if ( typeof port === 'undefined' ) {
+// 		port = new SerialPort(uart, { baudRate: 115200 });
 
-		port.on('error', function(err) {
-			console.log('Error: ', err.message);
-		});
-		port.on('data', function(data){
-			let result = data.toString()
-			if(result == outputData[dataIndex]) {
-				if(result == "1,0")
-					event.reply('TBL:update', 1);
-				else
-					event.reply('TBL:update', 4);
-			} else {
-				if(result == "1,0")
-					event.reply('TBL:update', 3);
-				else
-					event.reply('TBL:update', 2);
-			}
-			dataIndex += 1;
-			if(dataIndex >= inputData.length) {
-				clearInterval(intervalObj);
-				console.log("Finished");
-			}
-		});
-	}
-	function sendCommand(data) {
-		port.write(data, (err) => {
-			if (err) console.log('Error on write: ', err.message);
-		});
-	}
+// 		port.on('error', function(err) {
+// 			console.log('Error: ', err.message);
+// 		});
+// 		port.on('data', function(data){
+// 			let result = data.toString()
+// 			if(result == outputData[dataIndex]) {
+// 				if(result == "1,0")
+// 					event.reply('TBL:update', 1);
+// 				else
+// 					event.reply('TBL:update', 4);
+// 			} else {
+// 				if(result == "1,0")
+// 					event.reply('TBL:update', 3);
+// 				else
+// 					event.reply('TBL:update', 2);
+// 			}
+// 			dataIndex += 1;
+// 			if(dataIndex >= inputData.length) {
+// 				clearInterval(intervalObj);
+// 				console.log("Finished");
+// 			}
+// 		});
+// 	}
+// 	function sendCommand(data) {
+// 		port.write(data, (err) => {
+// 			if (err) console.log('Error on write: ', err.message);
+// 		});
+// 	}
 
-	function sendData() {
-		inputData[dataIndex].split(',').forEach( (value) => {
-			let fValue = parseFloat(value);
-			if(fValue >= 0) {
-				value = value.replace('-', '');
-				value = "+" + value;
-			}
-			sendCommand(value);
-		});
-	}
+// 	function sendData() {
+// 		inputData[dataIndex].split(',').forEach( (value) => {
+// 			let fValue = parseFloat(value);
+// 			if(fValue >= 0) {
+// 				value = value.replace('-', '');
+// 				value = "+" + value;
+// 			}
+// 			sendCommand(value);
+// 		});
+// 	}
 
 
-	if(inputData.length === 0) {
+// 	if(inputData.length === 0) {
 
-		function readInputFile() {
-			lineReader.eachLine(input_path, function(line, last) {
-				inputData.push(line);
-				if(last) {
-					readOutputFile();
-				}
-			});
-		}
+// 		function readInputFile() {
+// 			lineReader.eachLine(input_path, function(line, last) {
+// 				inputData.push(line);
+// 				if(last) {
+// 					readOutputFile();
+// 				}
+// 			});
+// 		}
 
-		function readOutputFile() {
-			lineReader.eachLine(output_path, function(line, last) {
-				outputData.push(line);
-				if(last) {
-					intervalObj = setInterval(() => {
-						sendData();
-					}, 200);
-				}
-			});
-		}
+// 		function readOutputFile() {
+// 			lineReader.eachLine(output_path, function(line, last) {
+// 				outputData.push(line);
+// 				if(last) {
+// 					intervalObj = setInterval(() => {
+// 						sendData();
+// 					}, 200);
+// 				}
+// 			});
+// 		}
 
-		readInputFile();
+// 		readInputFile();
 
-	} else {
-		sendData();
-	}
+// 	} else {
+// 		sendData();
+// 	}
 
-});
+// });
+
+
 
 ipcMain.on('uart:reload', (event) => {
 	

@@ -114,8 +114,8 @@
 
 <script type="text/javascript">
 
-    const electron = require('electron');
-    const { ipcRenderer } = electron;
+    // const electron = require('electron');
+    // const { ipcRenderer } = electron;
 
     $(document).ready(function() {
 
@@ -142,12 +142,13 @@
         var tbl_FN = 0;
 
         ipcRenderer.on('TBL:update', (event, val) => {
+
             if(val == 1) {
                 tbl_TP += 1;
                 $("#tbl_TP").text(tbl_TP);
             } else if(val == 2) {
                 tbl_FP += 1;
-                $("#tbl_TP").text(tbl_TP);
+                $("#tbl_FP").text(tbl_FP);
             } else if(val == 3) {
                 tbl_TN += 1;
                 $("#tbl_TN").text(tbl_TN);
