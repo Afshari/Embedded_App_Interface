@@ -75,7 +75,6 @@ function deactivate() {
         clientTracking.end();
         clientTracking.destroy();
     }
-
 }
 
 ipcMain.on('tracking:vision:send', (event, data) => {

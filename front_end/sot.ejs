@@ -1,9 +1,16 @@
 <%- include('./import_above_content.ejs', { Title: "Single Object Tracking in Clutter", PageAddr: 'sot' } ) %>
 
 
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-theme" id="btnErase">Reset</button>
+    <button type="button" class="btn btn-warning" id="btnMiss">Add Miss Detection</button>
+    <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
+    <button type="button" class="btn btn-success" id="btnRandomClutter">Add Random Clutter</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+</div>
+
 <main>
 </main>
-
 
 
 <%- include('./import_below_content.ejs') %>
@@ -11,7 +18,20 @@
 <script type="text/javascript">
 
 const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
+var Enum = require('enum')
 
+var State = new Enum( { 
+
+    'pause': 1,
+    'drawData': 2, 
+    'addData': 3, 
+    'randomClutter': 4,
+    'missDetection': 5,
+    'drawStepByStep': 7,
+
+} )
+
+var state = State.drawData;
 
 const windowWidth = 900;
 const windowHeight = 600;
@@ -19,6 +39,7 @@ var objs = []
 
 var groundTruthX = 0
 var groundTruthY = 0
+const CLUTTER_PER_STEP = 3;
 
 // const matrix = Matrix.ones(5, 5);
 
@@ -54,17 +75,63 @@ function getWidthHeightOrient(covar, HH) {
 }
 
 
+function arrShuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
+
+
 $(document).ready( () => {
 
     const { ipcRenderer } = require('electron')
 
-    ipcRenderer.on('sot:draw', (event, args) => {
-        objs.push(args)
+    ipcRenderer.on('sot:draw', (event, x, y) => {
+        objs.push([x, y])
+        // console.log(args)
+    })
+
+    $("#btnErase").click(function() {
+        eraseAll();
+        frameRate(40);
+    })
+
+    $("#btnMeasure").click(function() {
+        addClutterToPath();
+    })
+
+    $("#btnRun").click(function() {
+        state = State.drawStepByStep;
+        clutters = arrShuffle(clutters);
+        ipcRenderer.send('tracking:send:prior', points[0])
+        frameRate(4);
+    })
+
+    $("#btnRandomClutter").click(function() {
+        state = State.randomClutter;
+    })
+
+    $("#btnMiss").click(function() {
+        state = State.missDetection;
     })
 
 });
 
-let scl = 20
+let scl = 20;
+var stepPointer = 0;
 
 function moveX(x) {
     return windowWidth/2 + (x * scl)
@@ -77,12 +144,14 @@ function moveY(y) {
 var shouldDraw = false
 var points = []
 var clutters = []
+var pathClutters = []
 
 // let measurementColor = [ 0, 255, 255, 170 ]
 let measurementColor = [ 0, 0, 0, 170 ]
 let groundtruthColor = [ 0, 0, 255, 255 ]
 let estimatedMeanColor = [ 255, 140, 0, 255 ]
 let estimatedCovarColor = [ 255, 0, 0, 90 ]
+let missDetectionColor = [ 255, 0, 0, 255 ]
 let measurementCircleRadius = 5
 
 function drawLegends() {
@@ -94,7 +163,8 @@ function drawLegends() {
     text('Measurements', 40, 30)
     text('Ground Truth', 40, 50)
     text('Estimated Mean', 40, 70)
-    text('Estimated Covariance', 40, 90)
+    // text('Estimated Covariance', 40, 90)
+    text('Miss Detection', 40, 90)
 
 
     noStroke()
@@ -109,11 +179,15 @@ function drawLegends() {
 
     noStroke()
     fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
-    circle(20, 70, measurementCircleRadius)
+    circle(20, 70, measurementCircleRadius*2)
+
+    // noStroke()
+    // fill(estimatedCovarColor[0], estimatedCovarColor[1], estimatedCovarColor[2], estimatedCovarColor[3])
+    // circle(20, 90, measurementCircleRadius*3)
 
     noStroke()
-    fill(estimatedCovarColor[0], estimatedCovarColor[1], estimatedCovarColor[2], estimatedCovarColor[3])
-    circle(20, 90, measurementCircleRadius*3)
+    fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+    circle(20, 90, measurementCircleRadius*2)
 
 }
 
@@ -138,6 +212,7 @@ function setup() {
 
     stroke(0)
     strokeWeight(2)
+    frameRate(40);
 
 }
 
@@ -148,7 +223,7 @@ function draw() {
     drawBackground()
     drawLegends()
 
-    if( shouldDraw == true && 
+    if( state == State.addData && 
         mouseX > 0 && mouseX < windowWidth &&
         mouseY > 0 && mouseY < windowHeight) {
 
@@ -159,32 +234,159 @@ function draw() {
         })
 
         if(canAddPoint == true)
-            points.push( [mouseX, mouseY] )
-
+            points.push( [mouseX, mouseY, 'measure'] )
     }
 
-    points.forEach(function(p, index, array) {
+    if(state == State.drawData || state == State.addData || state == State.randomClutter || 
+            state == State.missDetection) {
 
-        fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-        stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-        circle(p[0], p[1], 3)
-        if(index > 0) {
-            line(p[0], p[1], array[index - 1][0], array[index - 1][1])
+        points.forEach(function(item, index, array) {
+
+            if(item[2] === 'measure') {
+
+                fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                circle(item[0], item[1], 3)
+
+            } else if(item[2] === 'miss') {
+
+                fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                stroke(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                circle(item[0], item[1], 5)
+            }
+            
+            if(index > 0) {
+                fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                line(item[0], item[1], array[index - 1][0], array[index - 1][1])
+            }
+
+            if( state == State.missDetection &&  dist(mouseX, mouseY, item[0], item[1]) < 10 ) {
+                circle(item[0], item[1], 10)
+            }
+
+        })
+
+        clutters.forEach(function(item, index, array) {
+
+            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            circle(item[0], item[1], 3)
+        })
+
+        pathClutters.forEach(function(item, index, array) {
+
+            if(points[ parseInt(index / CLUTTER_PER_STEP) ][2] === 'measure') {
+
+                fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+                stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+
+            } else if(points[ parseInt(index / CLUTTER_PER_STEP) ][2] === 'miss') {
+                fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                stroke(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+            }
+            circle(item[0], item[1], 3)
+        })
+
+    } else if(state == State.drawStepByStep) {
+
+        // var index = stepPointer - 1;
+        // index = (index >= 0) ? index : 0;
+        for(var index = 0; index < stepPointer; index++) {
+
+            var item = points[index];
+
+            // fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            // stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            // circle(item[0], item[1], 3)
+
+            if(item[2] === 'measure') {
+
+                fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                circle(item[0], item[1], 3)
+
+            } else if(item[2] === 'miss') {
+
+                fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                stroke(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                circle(item[0], item[1], 5)
+            }
+
+
+            if(index > 0) {
+                line(item[0], item[1], points[index - 1][0], points[index - 1][1])
+            }
         }
-    })
+
+        measurements = []
+
+        var refIndex = CLUTTER_PER_STEP * (stepPointer);
+        refIndex = (refIndex >= 0) ? refIndex : 0;
+        for(var index = 0; index < CLUTTER_PER_STEP * (stepPointer + 1) && index < pathClutters.length; index++) {
+
+            var item = pathClutters[index];
+
+            // fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            // stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            // circle(item[0], item[1], 3);
+
+            if(points[ parseInt(index / CLUTTER_PER_STEP) ][2] === 'measure') {
+
+                fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+                stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+
+            } else if(points[ parseInt(index / CLUTTER_PER_STEP) ][2] === 'miss') {
+
+                fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+                stroke(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+            }
+
+            circle(item[0], item[1], 3);
+
+            if(index >= refIndex && points[ parseInt(index / CLUTTER_PER_STEP) ][2] === 'measure')
+                measurements.push( item )
+        }
 
 
-    clutters.forEach(function(p, index, array) {
+        var coeff = clutters.length / points.length;
+        refIndex = parseInt(coeff * (stepPointer - 1));
+        refIndex = (refIndex >= 0) ? refIndex : 0;
+        for(var index = 0; index < coeff * stepPointer && index < clutters.length; index++) {     
 
-        fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-        stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-        circle(p[0], p[1], 3)
-    })
+            var item = clutters[index];
+
+            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            circle(item[0], item[1], 3)
+
+            if(index >= refIndex)
+                measurements.push( item )
+        }
+
+        
+        if(stepPointer < points.length - 1) {
+            console.log(measurements.length)
+            if(measurements.length > 0)
+                ipcRenderer.send('tracking:send:measurements', measurements)
+
+            stepPointer += 1;
+        }
+
+    }
 
     // console.log(getFrameRate())
     
 
-    // objs.forEach(function(objToDraw, index, array) {
+    objs.forEach(function(objToDraw, index, array) {
+
+        stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+        fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+        var x = objToDraw[0]
+        var y = objToDraw[1]
+        circle(x, y, 5)
+
+    })
 
 
     //     // Draw Estimated Mean
@@ -248,28 +450,81 @@ function draw() {
     // })
 }
 
+function eraseAll() {
+
+    points = [];
+    clutters = [];
+    pathClutters = [];
+    objs = [];
+    state = State.drawData;
+    stepPointer = 0;
+}
+
+function addClutterNearMouse() {
+
+    for(var j = 0; j < 7; j++) {
+        clutters.push( [ mouseX + random(-50, 50), mouseY + random(-50, 50) ] )
+    }
+}
+
+function addClutterToPath() {
+
+    pathClutters = []
+    points.forEach(function(p, index, array) {
+        for(var j = 0; j < CLUTTER_PER_STEP; j++)
+            pathClutters.push( [ p[0] + random(-15, 15), p[1] + random(-15, 15) ] )
+    })
+
+    // console.log(points.length)
+    // console.log(pathClutters.length)
+}
+
 function keyPressed() {
+
     if(key == 'e') {
-        points = []
-        clutters = []
+        eraseAll();
     } else if(key == 'd') {
-        for(var j = 0; j < 5; j++) {
-            clutters.push( [ mouseX + random(-50, 50), mouseY + random(-50, 50) ] )
-        }
+        // addClutterNearMouse();
     } else if(key == 'c') {
-        points.forEach(function(p, index, array) {
-           for(var j = 0; j < 2; j++)
-                clutters.push( [ p[0] + random(-10, 10), p[1] + random(-10, 10) ] )
-        })
+        addClutterToPath();
     }
 }
 
 function mousePressed() {
-    shouldDraw = true
+
+    if( mouseX >= 0 && mouseX <= width &&
+        mouseY >= 0 && mouseY <= height) { 
+        
+        if(state == State.drawData) {
+
+            eraseAll();
+            state = State.addData;
+
+        } else if(state == State.randomClutter) {
+
+            addClutterNearMouse();
+
+        } else if(state == State.missDetection) {
+
+
+            points.forEach(function(item, index, array) {
+
+                if( dist(mouseX, mouseY, item[0], item[1]) < 10 ) {
+                    // circle(item[0], item[1], 10)
+                    array[index] = [item[0], item[1], 'miss']
+                }
+
+            })
+
+
+        }
+    }
 }
 
 function mouseReleased() {
-    shouldDraw = false
+
+    if(state == State.addData)
+        state = State.drawData;
 }
 
 </script>

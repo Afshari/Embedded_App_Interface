@@ -20,6 +20,7 @@ let prior
 let listOfGroundTruth
 var isAc
 var _isActive = false;
+var _isConnected = false;
 
 function init(win) {
 
@@ -27,7 +28,7 @@ function init(win) {
 
     const timeoutObj = setTimeout(function () {
         
-        // connect()
+        connect()
 
         // listOfData = readDataFile('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
         // prior = getPrior('/Users/mohsen/Documents/state_estimate_ws/MOT/stonesoup/PDA/sot_data.txt')
@@ -43,7 +44,23 @@ function init(win) {
     }, 2000)
 }
 
+function isActive() {
+    return _isActive;
+}
 
+function deactivate() {
+
+    if(_isActive == true)        
+        _isActive = false;
+
+    if(_isConnected == true) {
+
+        _isConnected = false;
+        client.write('EOF');
+        client.end();
+        client.destroy();
+    }
+}
  
   
 function loopThroughSplittedText(values, ground_truth) {
@@ -73,9 +90,7 @@ function loopThroughSplittedText(values, ground_truth) {
 function getPrior(path) {
 
     const data = fs.readFileSync(path, 'utf-8')
-
     arr = data.split('\r\n')
-
     return [ arr[0].replace('x: ', ''), arr[1].replace('P: ', '') ]
 }
 
@@ -138,81 +153,97 @@ function readGroundTruthFile(path) {
     return listOfData;
 }
 
-function isActive() {
-
-    return _isActive;
-}
-
-function deactivate() {
-
-    _isActive = true;
-}
 
 var client = new net.Socket();
 
 function connect() {
     client.connect(6060, '127.0.0.1', function() {
+        _isConnected = true;
         console.log('Connected');
     });
 }
 
 
 function sendPrior(prior) {
-    client.write(prior[0] + '|' + prior[1] + '|40:')
+    // client.write(prior[0] + '|' + prior[1] + '|40:')
+    // client.write('prior: ' + prior)
 }
+
+ipcMain.on('tracking:send:prior', (event, data) => {
+
+    client.write('prior: ' + data)
+})
+
+ipcMain.on('tracking:send:measurements', (event, data) => {
+
+    client.write('measurements: ' + data)
+})
+
 
 function sendMeasurement(measurement, dt) {
     client.write(measurement + '|24:' + dt + '|89:')
 }
 
+
 client.on('data', function(data) {
+
+    data = data.toString().split(',')
+    // console.log()
+    // console.log(parseInt(data[0]), parseInt(data[1]))
+    mainWindow.webContents.send('sot:draw', parseInt(data[0]), parseInt(data[1]));
+
+
+})
+
+
+// client.on('data', function(data) {
 	
-    if(data == '50') {
-        console.log("State 1 Finished")
+//     if(data == '50') {
+//         console.log("State 1 Finished")
         
-        sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt'])
+//         sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt'])
 
-    } else {
+//     } else {
 
-        data = data.toString()
-        data = data.split('|')
-        var x = data[0].replaceAll('\n', ' ')
-        x = x.split(' ').filter( element => element != '')
-        var covar = data[1].replaceAll('\n', ' ')
-        covar = covar.split(' ').filter( element => element != '')
-        covar = covar.join(', ')
+//         data = data.toString()
+//         data = data.split('|')
+//         var x = data[0].replaceAll('\n', ' ')
+//         x = x.split(' ').filter( element => element != '')
+//         var covar = data[1].replaceAll('\n', ' ')
+//         covar = covar.split(' ').filter( element => element != '')
+//         covar = covar.join(', ')
         
-        mainWindow.webContents.send('sot:draw', { 
-            type: 'circle', 
-            x: x[0],
-            y: x[2],
-            r: 5,
-            covar: covar,
-            measurements: listOfData[dataCounter]['measurements'], 
-            truthX: listOfGroundTruth[dataCounter]['x'],
-            truthY: listOfGroundTruth[dataCounter]['y']
-        })
+//         mainWindow.webContents.send('sot:draw', { 
+//             type: 'circle', 
+//             x: x[0],
+//             y: x[2],
+//             r: 5,
+//             covar: covar,
+//             measurements: listOfData[dataCounter]['measurements'], 
+//             truthX: listOfGroundTruth[dataCounter]['x'],
+//             truthY: listOfGroundTruth[dataCounter]['y']
+//         })
 
         
-        dataCounter += 1
-        if(dataCounter < listOfData.length) {
+//         dataCounter += 1
+//         if(dataCounter < listOfData.length) {
 
-            const timeoutObj = setTimeout(function () {
+//             const timeoutObj = setTimeout(function () {
         
-                sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt']) 
-                clearTimeout(timeoutObj)
+//                 sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt']) 
+//                 clearTimeout(timeoutObj)
         
-            }, 1000)
+//             }, 1000)
 
-            // sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt'])
+//             // sendMeasurement(listOfData[dataCounter]['measurements'], listOfData[dataCounter]['dt'])
 
-        } else {
-            console.log("Operation Finished")
-            client.destroy(); // kill client after server's response
-        }
-    }
+//         } else {
+//             console.log("Operation Finished")
+//             client.destroy(); // kill client after server's response
+//         }
+//     }
 	
-});
+// });
 
 client.on('close', function() {
 	console.log('Connection closed');
