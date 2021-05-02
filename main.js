@@ -11,6 +11,7 @@ var linearAlgebra = require('linear-algebra')(),
 const sot = require('./sot');
 const rls = require('./rls');
 const lite_ids = require('./lite_ids');
+const a_star = require('./a_star');
 const detectron_tracking = require('./detectron_tracking');
 
 
@@ -59,6 +60,9 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	} else if(lastPage === 'lite_ids.ejs') {
 
+	} else if(lastPage === 'a_star') {
+
+		a_star.deactivate();
 	}
 
 	if(addr === 'rls.ejs') {
@@ -80,6 +84,11 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 		lite_ids.init(win);
 		win.loadFile('front_end/lite_ids.ejs');
+
+	} else if(addr === 'a_star.ejs') {
+
+		a_star.init(win);
+		win.loadFile('front_end/a_star.ejs');
 
 	}
 

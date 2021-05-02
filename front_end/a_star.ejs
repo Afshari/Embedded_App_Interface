@@ -1,0 +1,289 @@
+<%- include('./import_above_content.ejs', { Title: "Path Planning A*" , PageAddr: 'a_star' } ) %>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-primary" id="btnRefresh">Refresh</button>
+    <button type="button" class="btn btn-primary" id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-primary" id="btnStart">Start</button>
+    <!-- <button type="button" id="btnPause" class="btn btn-primary">Run</button> -->
+    <button type="button" class="btn btn-success" id="btnNext">Next</button>
+</div>
+
+<main>
+</main>
+
+<%- include('./import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+$(document).ready(function() {
+
+    $("#btnConnect").click(function(e) {
+
+        ipcRenderer.send('path_finding:server:connect')
+    })
+
+    $("#btnStart").click(function(e) {
+        
+        ipcRenderer.send('path_finding:send:size', `${rows},${cols}`)
+
+        var strData = ""
+        for (var i = 0; i < cols; i++) {
+            for (var j = 0; j < rows; j++) {
+                if(strData != "")
+                    strData += ","
+                strData += `${ grid[i][j].wall == true ? 0 : 1}`
+                // strData += `${i}, ${j},${grid[i][j].wall.toString()}`
+            }
+        }
+        ipcRenderer.send('path_finding:send:data', strData)
+        
+        e.preventDefault()
+        return false
+    })
+
+    $("#btnPause").click(function() {
+        ipcRenderer.send('path_finding:send:end')
+    })
+
+    $("#btnNext").click(function() {
+        ipcRenderer.send('path_finding:send:next')
+    })
+
+    $("#btnRefresh").click(function() {
+        refreshGrid();
+    })
+
+})
+
+ipcRenderer.on('path_finding:draw:path', function (event, message) {
+
+    data = message.split(';');
+    for(var k = 0; k < data.length; k++) {
+        var i = parseInt( data[k].split(',')[0] );
+        var j = parseInt( data[k].split(',')[1] );
+        stroke(255, 0, 0, 255);
+        grid[i][j].show(color(255, 0, 0, 255));
+    }
+})
+
+ipcRenderer.on('path_finding:draw:step', function (event, message) {
+
+    openList = message.split('|')[0]
+    closedList = message.split('|')[1]
+
+
+    background(255);
+
+    // Draw Grid
+    for (var i = 0; i < cols; i++) {
+        for (var j = 0; j < rows; j++) {
+            grid[i][j].show();
+        }
+    }
+
+    // Draw Open List
+    data = openList.split(';');
+
+    for(var k = 0; k < data.length; k++) {
+        var current = data[k].split(',');
+        if(current.length > 1) {
+            var i = parseInt( current[0] );
+            var j = parseInt( current[1] );
+            stroke(0, 255, 0, 50);
+            grid[i][j].show(color(0, 255, 0, 50));
+        }
+    }
+
+    // Draw Closed List
+    data = closedList.split(';');
+
+    for(var k = 0; k < data.length; k++) {
+        var current = data[k].split(',')
+        console.log(current.length)
+        // if(current != 2)
+            // continue
+
+        var i = parseInt( current[0] );
+        var j = parseInt( current[1] );
+        stroke(255, 0, 0, 50);
+        grid[i][j].show(color(255, 0, 0, 50));
+    }
+
+    ipcRenderer.send('path_finding:send:next')
+
+})
+
+
+function Spot(i, j) {
+    // Location
+    this.i = i;
+    this.j = j;
+
+    // f, g, and h values for A*
+    this.f = 0;
+    this.g = 0;
+    this.h = 0;
+
+    // Neighbors
+    this.neighbors = [];
+
+    // Where did I come from?
+    this.previous = undefined;
+
+    // Am I a wall?
+    this.wall = false;
+    if (random(1) < 0.4) {
+        this.wall = true;
+    }
+
+    // Display me
+    this.show = function (col) {
+        if (this.wall) {
+            fill(0);
+            noStroke();
+            rect(this.i * w, this.j * h, w, h);
+            //   ellipse(this.i * w + w / 2, this.j * h + h / 2, w / 2, h / 2);
+        } else if (col) {
+            fill(col);
+            rect(this.i * w, this.j * h, w, h);
+        }
+    };
+
+    // Figure out who my neighbors are
+    this.addNeighbors = function (grid) {
+        var i = this.i;
+        var j = this.j;
+        if (i < cols - 1) {
+            this.neighbors.push(grid[i + 1][j]);
+        }
+        if (i > 0) {
+            this.neighbors.push(grid[i - 1][j]);
+        }
+        if (j < rows - 1) {
+            this.neighbors.push(grid[i][j + 1]);
+        }
+        if (j > 0) {
+            this.neighbors.push(grid[i][j - 1]);
+        }
+        if (i > 0 && j > 0) {
+            this.neighbors.push(grid[i - 1][j - 1]);
+        }
+        if (i < cols - 1 && j > 0) {
+            this.neighbors.push(grid[i + 1][j - 1]);
+        }
+        if (i > 0 && j < rows - 1) {
+            this.neighbors.push(grid[i - 1][j + 1]);
+        }
+        if (i < cols - 1 && j < rows - 1) {
+            this.neighbors.push(grid[i + 1][j + 1]);
+        }
+    };
+}
+
+// Function to delete element from the array
+function removeFromArray(arr, elt) {
+    // Could use indexOf here instead to be more efficient
+    for (var i = arr.length - 1; i >= 0; i--) {
+        if (arr[i] == elt) {
+            arr.splice(i, 1);
+        }
+    }
+}
+
+// An educated guess of how far it is between two points
+function heuristic(a, b) {
+    var d = dist(a.i, a.j, b.i, b.j);
+    // var d = abs(a.i - b.i) + abs(a.j - b.j);
+    return d;
+}
+
+// How many columns and rows?
+var cols = 25;
+var rows = 25;
+
+// This will be the 2D array
+var grid = new Array(cols);
+
+// Open and closed set
+var openSet = [];
+var closedSet = [];
+
+// Start and end
+var start;
+var end;
+
+// Width and height of each cell of grid
+var w, h;
+
+// The road taken
+var path = [];
+
+function refreshGrid() {
+
+    // Making a 2D array
+    for (var i = 0; i < cols; i++) {
+        grid[i] = new Array(rows);
+    }
+
+    for (var i = 0; i < cols; i++) {
+        for (var j = 0; j < rows; j++) {
+            grid[i][j] = new Spot(i, j);
+        }
+    }
+
+    // All the neighbors
+    for (var i = 0; i < cols; i++) {
+        for (var j = 0; j < rows; j++) {
+            grid[i][j].addNeighbors(grid);
+        }
+    }
+
+    // Start and end
+    start = grid[0][0];
+    end = grid[cols - 1][rows - 1];
+    start.wall = false;
+    end.wall = false;
+
+    // openSet starts with beginning only
+    openSet.push(start);
+
+    background(255);
+
+    for (var i = 0; i < cols; i++) {
+        for (var j = 0; j < rows; j++) {
+            grid[i][j].show();
+        }
+    }
+
+}
+
+function setup() {
+
+    createCanvas(500, 500);
+    // console.log('A*');
+
+    // Grid cell size
+    w = width / cols;
+    h = height / rows;
+
+    refreshGrid();
+
+    noLoop();
+}
+
+function draw() {
+
+    // Draw current state of everything
+    background(255);
+
+    for (var i = 0; i < cols; i++) {
+        for (var j = 0; j < rows; j++) {
+            grid[i][j].show();
+        }
+    }
+
+
+}
+
+
+</script>

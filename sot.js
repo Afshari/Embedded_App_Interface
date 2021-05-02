@@ -14,11 +14,11 @@ module.exports = {
     deactivate
 }
 
-let listOfData
-var dataCounter = 0
-let prior
-let listOfGroundTruth
-var isAc
+// let listOfData
+// var dataCounter = 0
+// let prior
+// let listOfGroundTruth
+// var isAc
 var _isActive = false;
 var _isConnected = false;
 
@@ -191,8 +191,6 @@ client.on('data', function(data) {
     // console.log()
     // console.log(parseInt(data[0]), parseInt(data[1]))
     mainWindow.webContents.send('sot:draw', parseInt(data[0]), parseInt(data[1]));
-
-
 })
 
 
