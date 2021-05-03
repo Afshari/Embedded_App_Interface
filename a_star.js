@@ -76,13 +76,26 @@ ipcMain.on('path_finding:send:data', (event, data) => {
     client.write('2:' + data)
 })
 
-ipcMain.on('path_finding:send:next', (event) => {
+ipcMain.on('path_finding:send:run', (event) => {
     client.write('4:')
 })
 
 // ipcMain.on('path_finding:send:end', (event) => {
 //     client.write('3:')
 // })
+
+ipcMain.on('path_finding:server:disconnect', (event, data) => {
+
+    disconnect();
+})
+
+function disconnect() {
+
+    if(_isConnected) {
+        _isConnected = false;
+        client.end();
+    }
+}
 
 
 client.on('data', function(message) {
@@ -100,13 +113,11 @@ client.on('data', function(message) {
 
     } else if(code === "12") {
         mainWindow.webContents.send('path_finding:draw:path', data);
-        // client.write('EOF');
-        _isConnected = false;
-        client.end();
-        // client.destroy();
+        disconnect();
+        // _isConnected = false;
+        // client.end();
     } else if(code === "13") {
         console.log("No Solution")
-        _isConnected = false;
-        client.end();
+        disconnect();
     }
 })

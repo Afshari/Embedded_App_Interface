@@ -1,11 +1,11 @@
 <%- include('./import_above_content.ejs', { Title: "Path Planning A*" , PageAddr: 'a_star' } ) %>
 
 <div style="margin: 5px;">
-    <button type="button" class="btn btn-primary" id="btnRefresh">Refresh</button>
-    <button type="button" class="btn btn-primary" id="btnConnect">Connect</button>
-    <button type="button" class="btn btn-primary" id="btnStart">Start</button>
-    <!-- <button type="button" id="btnPause" class="btn btn-primary">Run</button> -->
-    <button type="button" class="btn btn-success" id="btnNext">Next</button>
+    <button type="button" class="btn btn-success" id="btnRandomGrid">Create Random Grid</button>
+    <button type="button" class="btn btn-theme" id="btnReset">Reset</button>    
+    <button type="button" class="btn btn-theme" id="btnStart">Start</button>
+    <button type="button" class="btn btn-warning" id="btnStop">Stop</button>
+    <button type="button" class="btn btn-success" id="btnErase">Erase All</button>
 </div>
 
 <main>
@@ -15,42 +15,104 @@
 
 <script type="text/javascript">
 
+var Enum = require('enum')
+
+var State = new Enum( { 
+
+    'ready': 1,
+    'running': 2, 
+    'stop': 3,
+
+} )
+var state = State.ready;
+
+
 $(document).ready(function() {
 
-    $("#btnConnect").click(function(e) {
-
-        ipcRenderer.send('path_finding:server:connect')
-    })
-
     $("#btnStart").click(function(e) {
-        
-        ipcRenderer.send('path_finding:send:size', `${rows},${cols}`)
 
-        var strData = ""
-        for (var i = 0; i < cols; i++) {
-            for (var j = 0; j < rows; j++) {
-                if(strData != "")
-                    strData += ","
-                strData += `${ grid[i][j].wall == true ? 0 : 1}`
-                // strData += `${i}, ${j},${grid[i][j].wall.toString()}`
-            }
+        // mustStop = false;
+        if(state == State.ready) {
+            noLoop();
+            ipcRenderer.send('path_finding:server:connect')
+
+            const timer1 = setTimeout(function () {
+                
+                ipcRenderer.send('path_finding:send:size', `${rows},${cols}`)
+
+                var strData = ""
+                for (var i = 0; i < cols; i++) {
+                    for (var j = 0; j < rows; j++) {
+                        if(strData != "")
+                            strData += ","
+                        strData += `${ grid[i][j].wall == true ? 0 : 1}`
+                    }
+                }
+                ipcRenderer.send('path_finding:send:data', strData)
+        
+                clearTimeout(timer1)
+
+            }, 500)
+
+
+            const timer2 = setTimeout(function () {
+
+                ipcRenderer.send('path_finding:send:run')
+                state = State.running;
+                clearTimeout(timer2)
+
+            }, 1000)
         }
-        ipcRenderer.send('path_finding:send:data', strData)
+
+
+    })
+
+    // $("#btnStart").click(function(e) {
         
-        e.preventDefault()
-        return false
+    //     ipcRenderer.send('path_finding:send:size', `${rows},${cols}`)
+
+    //     var strData = ""
+    //     for (var i = 0; i < cols; i++) {
+    //         for (var j = 0; j < rows; j++) {
+    //             if(strData != "")
+    //                 strData += ","
+    //             strData += `${ grid[i][j].wall == true ? 0 : 1}`
+    //             // strData += `${i}, ${j},${grid[i][j].wall.toString()}`
+    //         }
+    //     }
+    //     ipcRenderer.send('path_finding:send:data', strData)
+        
+    //     e.preventDefault()
+    //     return false
+    // })
+
+    // $("#btnPause").click(function() {
+    //     ipcRenderer.send('path_finding:send:end')
+    // })
+
+    $("#btnStop").click(function() {
+        // mustStop = true;
+        if(state == State.running) {
+            state = State.stop;
+            ipcRenderer.send('path_finding:server:disconnect');
+        }
     })
 
-    $("#btnPause").click(function() {
-        ipcRenderer.send('path_finding:send:end')
+    $("#btnRandomGrid").click(function() {
+        if(state == State.ready)
+            refreshGrid(true);
     })
 
-    $("#btnNext").click(function() {
-        ipcRenderer.send('path_finding:send:next')
+    $("#btnErase").click(function() {
+        if(state == State.ready)
+            refreshGrid(false);
     })
 
-    $("#btnRefresh").click(function() {
-        refreshGrid();
+    $("#btnReset").click(function() {
+        if(state == State.stop) {
+            state = State.ready;
+            loop();
+        }
     })
 
 })
@@ -64,6 +126,7 @@ ipcRenderer.on('path_finding:draw:path', function (event, message) {
         stroke(255, 0, 0, 255);
         grid[i][j].show(color(255, 0, 0, 255));
     }
+    state = State.stop;
 })
 
 ipcRenderer.on('path_finding:draw:step', function (event, message) {
@@ -98,127 +161,77 @@ ipcRenderer.on('path_finding:draw:step', function (event, message) {
     data = closedList.split(';');
 
     for(var k = 0; k < data.length; k++) {
-        var current = data[k].split(',')
-        console.log(current.length)
-        // if(current != 2)
-            // continue
 
-        var i = parseInt( current[0] );
-        var j = parseInt( current[1] );
-        stroke(255, 0, 0, 50);
-        grid[i][j].show(color(255, 0, 0, 50));
+        if(current.length > 1) {
+            var current = data[k].split(',')
+            var i = parseInt( current[0] );
+            var j = parseInt( current[1] );
+            stroke(255, 0, 0, 50);
+            grid[i][j].show(color(255, 0, 0, 50));
+        }
     }
 
-    ipcRenderer.send('path_finding:send:next')
+    if(state == State.running)
+        ipcRenderer.send('path_finding:send:run')
 
 })
 
 
-function Spot(i, j) {
-    // Location
+function Spot(i, j, genRandom) {
+    
     this.i = i;
     this.j = j;
 
-    // f, g, and h values for A*
-    this.f = 0;
-    this.g = 0;
-    this.h = 0;
-
-    // Neighbors
-    this.neighbors = [];
-
-    // Where did I come from?
-    this.previous = undefined;
-
-    // Am I a wall?
     this.wall = false;
-    if (random(1) < 0.4) {
-        this.wall = true;
+
+    if(genRandom == true) {
+        if (random(1) < 0.3) {
+            this.wall = true;
+        }
     }
 
-    // Display me
+
     this.show = function (col) {
         if (this.wall) {
             fill(0);
             noStroke();
             rect(this.i * w, this.j * h, w, h);
-            //   ellipse(this.i * w + w / 2, this.j * h + h / 2, w / 2, h / 2);
         } else if (col) {
             fill(col);
             rect(this.i * w, this.j * h, w, h);
         }
     };
 
-    // Figure out who my neighbors are
-    this.addNeighbors = function (grid) {
-        var i = this.i;
-        var j = this.j;
-        if (i < cols - 1) {
-            this.neighbors.push(grid[i + 1][j]);
-        }
-        if (i > 0) {
-            this.neighbors.push(grid[i - 1][j]);
-        }
-        if (j < rows - 1) {
-            this.neighbors.push(grid[i][j + 1]);
-        }
-        if (j > 0) {
-            this.neighbors.push(grid[i][j - 1]);
-        }
-        if (i > 0 && j > 0) {
-            this.neighbors.push(grid[i - 1][j - 1]);
-        }
-        if (i < cols - 1 && j > 0) {
-            this.neighbors.push(grid[i + 1][j - 1]);
-        }
-        if (i > 0 && j < rows - 1) {
-            this.neighbors.push(grid[i - 1][j + 1]);
-        }
-        if (i < cols - 1 && j < rows - 1) {
-            this.neighbors.push(grid[i + 1][j + 1]);
-        }
-    };
 }
 
 // Function to delete element from the array
-function removeFromArray(arr, elt) {
-    // Could use indexOf here instead to be more efficient
-    for (var i = arr.length - 1; i >= 0; i--) {
-        if (arr[i] == elt) {
-            arr.splice(i, 1);
-        }
-    }
-}
+// function removeFromArray(arr, elt) {
+//     // Could use indexOf here instead to be more efficient
+//     for (var i = arr.length - 1; i >= 0; i--) {
+//         if (arr[i] == elt) {
+//             arr.splice(i, 1);
+//         }
+//     }
+// }
 
 // An educated guess of how far it is between two points
-function heuristic(a, b) {
-    var d = dist(a.i, a.j, b.i, b.j);
-    // var d = abs(a.i - b.i) + abs(a.j - b.j);
-    return d;
-}
+// function heuristic(a, b) {
+//     var d = dist(a.i, a.j, b.i, b.j);
+//     return d;
+// }
 
 // How many columns and rows?
-var cols = 25;
-var rows = 25;
+var cols = 50;
+var rows = 50;
 
 // This will be the 2D array
 var grid = new Array(cols);
+// var mustStop = false;
 
-// Open and closed set
-var openSet = [];
-var closedSet = [];
-
-// Start and end
-var start;
-var end;
-
-// Width and height of each cell of grid
 var w, h;
 
-// The road taken
-var path = [];
 
-function refreshGrid() {
+function refreshGrid(genRandom) {
 
     // Making a 2D array
     for (var i = 0; i < cols; i++) {
@@ -227,25 +240,12 @@ function refreshGrid() {
 
     for (var i = 0; i < cols; i++) {
         for (var j = 0; j < rows; j++) {
-            grid[i][j] = new Spot(i, j);
+            grid[i][j] = new Spot(i, j, genRandom);
         }
     }
 
-    // All the neighbors
-    for (var i = 0; i < cols; i++) {
-        for (var j = 0; j < rows; j++) {
-            grid[i][j].addNeighbors(grid);
-        }
-    }
-
-    // Start and end
-    start = grid[0][0];
-    end = grid[cols - 1][rows - 1];
-    start.wall = false;
-    end.wall = false;
-
-    // openSet starts with beginning only
-    openSet.push(start);
+    grid[0][0].wall = false;
+    grid[cols - 1][rows - 1].wall = false;
 
     background(255);
 
@@ -266,9 +266,9 @@ function setup() {
     w = width / cols;
     h = height / rows;
 
-    refreshGrid();
+    refreshGrid(true);
 
-    noLoop();
+    // noLoop();
 }
 
 function draw() {
@@ -281,9 +281,31 @@ function draw() {
             grid[i][j].show();
         }
     }
-
-
 }
 
+
+function mousePressed() {
+    
+    if(state == State.ready &&
+        mouseX >= 0 && mouseX < width &&
+        mouseY >= 0 && mouseY < height) {
+        var i = parseInt( mouseX / w)
+        var j = parseInt( mouseY / h)
+        console.log(i, j);
+        grid[i][j].wall = !grid[i][j].wall;
+    }
+}
+
+function mouseDragged() {
+
+    if(state == State.ready &&
+        mouseX >= 0 && mouseX < width &&
+        mouseY >= 0 && mouseY < height) {
+        var i = parseInt( mouseX / w)
+        var j = parseInt( mouseY / h)
+        console.log(i, j);
+        grid[i][j].wall = true;
+    }
+}
 
 </script>
