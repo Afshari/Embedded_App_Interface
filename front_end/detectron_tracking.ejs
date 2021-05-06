@@ -540,7 +540,8 @@ function mouseClicked() {
                 rect(currX1, currY1, currX2-currX1, currY2-currY1)
 
                 state = State.pause_Tracking
-                ipcRenderer.send('tracking:tracking:send', 'prior: ' + item)
+                // ipcRenderer.send('tracking:tracking:send', 'prior: ' + item)
+                ipcRenderer.send('tracking:tracking:send', '20: ' + item)
 //                 shouldDrawRect = true
 //                 shouldSendData = true
 

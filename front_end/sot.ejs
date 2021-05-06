@@ -116,6 +116,7 @@ $(document).ready( () => {
     $("#btnRun").click(function() {
         state = State.drawStepByStep;
         clutters = arrShuffle(clutters);
+        // points[0].push(10)
         ipcRenderer.send('tracking:send:prior', points[0])
         frameRate(4);
     })
@@ -482,11 +483,11 @@ function addClutterToPath() {
 function keyPressed() {
 
     if(key == 'e') {
-        eraseAll();
+        // eraseAll();
     } else if(key == 'd') {
         // addClutterNearMouse();
     } else if(key == 'c') {
-        addClutterToPath();
+        // addClutterToPath();
     }
 }
 
