@@ -4,6 +4,11 @@ node_modules
 dist
 
 data/environment_images/*
+__pycache__
+.ipynb_checkpoints
+siamfc/output/*
+siamfc/data/*
+siamfc/results/*
 
 #files
 *.tgz
