@@ -20,6 +20,8 @@
     "bluebird": "^3.7.2",
     "electron-context-menu": "^2.4.0",
     "enum": "^3.0.4",
+    "glob": "^7.1.7",
+    "glob-fs": "^0.1.7",
     "katex": "^0.12.0",
     "linear-algebra": "^3.1.4",
     "mathjax": "^3.1.2",

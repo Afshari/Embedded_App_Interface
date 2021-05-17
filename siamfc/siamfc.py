@@ -300,7 +300,7 @@ class TrackerSiamFC(Tracker):
         start_time = time.time()
 
         if f == 0:
-            print(box)
+            # print(box)
             self.init(image, box)
         else:
             box = self.update(image)

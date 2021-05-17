@@ -1,0 +1,405 @@
+<%- include('./import_above_content.ejs', { Title: "Object Tracking with SiamFC", PageAddr: 'siamfc' } ) %>
+
+<div class="row mt">
+    <div class="col-lg-8">
+        <div class="form-panel">
+            <h4 class="mb"><i class="fa fa-angle-right"></i> Datasets</h4>
+            <div class="form-horizontal style-form" method="get">
+                <div class="form-group">
+                    <label class="col-sm-2 col-sm-2 control-label">Select Dataset</label>
+                    <div class="col-sm-8">
+                        <select class="form-control" id="dataset_select">
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="reloadDataset">Reload</button>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-2 col-sm-2 control-label">Input Scale</label>
+                    <div class="col-sm-8">
+                        <select class="form-control" id="image_scale">
+                            <option value="1">1</option>
+                            <option value="2">1/2</option>
+                            <option value="3">1/3</option>
+                            <option value="4">1/4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-sm-2 col-sm-2 control-label">Run Type</label>
+                    <div class="col-sm-8">
+                        <select class="form-control" id="run_type">
+                            <option value="1">Normal</option>
+                            <option value="2">Save</option>
+                            <option value="3">Load From Saved Data</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="col-sm-2 col-sm-2 control-label"></label>
+                    <div class="col-sm-10">
+                        <button type="button" class="btn btn-theme"     id="btnShowImage">Show Image</button>
+                        <button type="button" class="btn btn-warning"   id="btnStop">Stop</button>
+                        <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
+                        <button type="button" class="btn btn-theme"     id="btnPause">Pause</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- col-lg-8-->
+</div>
+<!-- /row -->
+
+<div style="margin: 5px;">
+</div>
+
+<main>
+</main>
+
+<br/> <br/> <br/> <br/> <br/> <br/> <br/> <br/>
+
+<%- include('./import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+const  fs = require('fs');
+var glob = require('glob-fs')({ gitignore: true });
+var Enum = require('enum');
+
+var State = new Enum( { 
+
+    'stop': 1,
+    'showImage': 2,
+    'drawRect': 4,
+    'pause': 5,
+    'running': 6
+} )
+
+var state = State.stop;
+
+const windowWidth = 1200;
+const windowHeight = 1500; 
+
+
+let inputImage = null;
+var groundtruthFile = null;
+var run_type = -1;
+
+$(document).ready( () => {
+
+    const { ipcRenderer } = require('electron')
+    // const { Notification } = require('electron')
+
+
+    $("#btnShowImage").click(function() {
+
+        console.log(state);
+
+        if(state == State.stop || state == State.showImage || state == State.drawRect) {
+
+            var dataset = $("#dataset_select option:selected").text();
+            var path = `siamfc/data/test/${dataset}`;
+            console.log(path)
+            var imagePaths = fs.readdirSync(path);
+            var imagePath = "";
+            for(var i = 0; i < imagePaths.length; i++) {
+                if(imagePaths[i].includes('.jpg')) {
+                    imagePath = imagePaths[i];
+                    break;
+                }
+            }
+            // var imagePath = glob.readdirSync(`${path}/*.jpg`, {})[0];
+            console.log(imagePath);
+            groundtruthFile = `${path}/groundtruth.txt`;
+
+            loadImage(`../${path}/${imagePath}`, img => {
+
+                inputImageScale = parseInt( $("#image_scale").val() );
+                img.resize(img.width/inputImageScale, img.height/inputImageScale);
+                createCanvas(img.width, img.height);
+                image(img, 0, 0)
+                inputImage = img;
+
+                rectStartY = null;
+                rectStartY = null;
+
+                state = State.showImage;
+                loop();
+
+                console.log(imagePath)
+            })
+        } else if(state == State.running || state == State.pause) {
+
+            showFlashMessage('You have to Stop Processing by Clicking the Stop Button', 'warning');
+        }
+
+        return false;
+    })
+
+
+    $("#btnRun").click(function() {
+
+        if(state == State.drawRect) {
+
+            noLoop();
+
+            var rectWidth  = Math.abs(rectEndX - rectStartX);
+            var rectHeight = Math.abs(rectEndY - rectStartY);
+            fs.writeFileSync(groundtruthFile, 
+                `${rectStartX*inputImageScale},${rectStartY*inputImageScale},${rectWidth*inputImageScale},${rectHeight*inputImageScale}`);
+            
+            var dataset_idx = $("#dataset_select").val();
+            run_type = $("#run_type").val();
+            ipcRenderer.send('siamfc:send:step', dataset_idx, run_type);
+
+            setCanvasSize = true;
+            state = State.running;
+
+        } else if(state == State.showImage && $("#run_type").val() == "3") {
+
+            noLoop();
+
+            var dataset_idx = $("#dataset_select").val();
+            run_type = $("#run_type").val();
+            ipcRenderer.send('siamfc:send:step', dataset_idx, run_type);
+
+            setCanvasSize = true;
+            state = State.running;
+
+        } else if(state == State.showImage) {
+        
+            showFlashMessage('First You have to Select Boundry around Object', 'warning');
+
+        } else if(state == State.pause) {
+
+            ipcRenderer.send('siamfc:send:step', -1, run_type);
+            state = State.running;
+        }
+    })
+
+    $("#btnPause").click(function() {
+
+        if(state == State.running) {
+            state = State.pause;
+        } else {
+            showFlashMessage('Application is not Running', 'warning');
+        }
+
+    });
+
+
+    $("#btnStop").click(function() {
+        if(state == State.running || state == State.pause) {
+            state = State.stop;
+        }
+    })
+
+
+    ipcRenderer.send('dataset:reload');
+    
+    $("#reloadDataset").click( (event) => {
+        ipcRenderer.send('dataset:reload');
+    });
+
+
+    ipcRenderer.on('dataset:data', (event, datasets) => {
+
+        datasets = datasets.split('\n')
+        console.log(datasets)
+        $('#dataset_select').find('option').remove();
+        datasets.forEach(function(i, dataset) {
+            $("#dataset_select").append(new Option(i, dataset));
+        });
+    });
+
+});
+
+var setCanvasSize = true;
+
+let titles = [  "Network Input",    "Layer1 Conv2d",	    "Layer1 BatchNorm2d",   "Layer1 ReLU", 
+                "Layer1 MaxPool2d", "Layer2 Conv2d",	    "Layer2 BatchNorm2d",   "Layer2 ReLU", 
+                "Layer2 MaxPool2d", "Layer3 Conv2d",	    "Layer3 BatchNorm2d",   "Layer3 ReLU",
+                "Layer4 Conv2d",	"Layer4 BatchNorm2d",   "Layer4 ReLU",          "Layer5 Conv2d" ]
+
+var inputImageWidth, inputImageHeight;
+var layersImageWidth, layersImageHeight;
+var inputImageScale = 3;
+
+
+ipcRenderer.on('siamfc:show:image', function (event, box) {
+
+    box = box.split(',')
+    x1 = parseInt( parseFloat(box[0]) ) / inputImageScale
+    y1 = parseInt( parseFloat(box[1]) ) / inputImageScale
+    x2 = parseInt( parseFloat(box[2]) ) / inputImageScale
+    y2 = parseInt( parseFloat(box[3]) ) / inputImageScale
+
+
+    loadImage('../siamfc/output/original.jpg', img => {
+
+        img.resize(img.width/inputImageScale, img.height/inputImageScale)
+        inputImageWidth = img.width
+        inputImageHeight = img.height
+
+        loadImage('../siamfc/output/merged_image.jpg', merged_img => {
+
+            var img_scale = merged_img.width / (inputImageWidth+inputImageHeight)
+            merged_img.resize(inputImageWidth+inputImageHeight, merged_img.height / img_scale)
+
+            if(setCanvasSize == true) {
+                createCanvas(merged_img.width, inputImageHeight + merged_img.height);
+                setCanvasSize = false;
+            }
+
+            image(img, 0, 0);
+            noFill()
+            stroke(255, 0, 0)
+            rect(x1, y1, x2, y2)
+
+            image(merged_img, 0, inputImageHeight);
+            layersImageWidth = merged_img.width / 4;
+            layersImageHeight = merged_img.height / 4;
+
+            loadImage('../siamfc/output/cross.jpg', cross_img => {
+                cross_img.resize(inputImageHeight, inputImageHeight)
+                image(cross_img, inputImageWidth, 0)
+
+                showTitles();
+                
+                if(state == State.running) {
+                    ipcRenderer.send('siamfc:send:step', -1, run_type);
+                }
+            })
+        })
+    })
+
+
+})
+
+
+
+let scl = 20;
+var stepPointer = 0;
+
+
+var shouldDraw = false
+var points = []
+var clutters = []
+var pathClutters = []
+
+
+function drawBackground() {
+
+    background(234, 234, 234);
+    fill(234, 234, 234);
+
+}
+
+
+function showTitles() {
+
+    textSize(16);
+    stroke(0);
+    textAlign(CENTER);
+    fill(255);
+    text('Input Image', inputImageWidth/2, 30);
+
+    textSize(12);
+    text('Cross Correlation Output', inputImageWidth+inputImageHeight/2, 30);
+
+    var img_x = 0;
+    var img_y = inputImageHeight;
+
+    for(var i = 0; i < titles.length; i++) {
+
+        if(i != 0 && i % 4 == 0) {
+            img_x  = 0;
+            img_y += layersImageHeight;
+        } 
+
+        text(titles[i], img_x + layersImageWidth/2, img_y+25);
+        img_x += layersImageWidth;
+    }
+
+}
+
+function setup() {
+    
+    createCanvas(windowWidth, windowHeight)
+    
+    drawBackground()
+
+    noLoop();
+}
+
+
+function draw() {    
+    
+    if(state == State.showImage || state == State.drawRect) {
+
+        if(inputImage != null) {
+            drawBackground();
+            image(inputImage, 0, 0);
+
+            if(rectStartX != null && rectStartY != null) {
+                noFill();
+                stroke(255, 0, 0);
+                if(mouseIsDown == true)
+                    rect(rectStartX, rectStartY, mouseX - rectStartX, mouseY - rectStartY);
+                else
+                    rect(rectStartX, rectStartY, rectEndX - rectStartX, rectEndY - rectStartY);
+            }
+        }
+
+    }
+    
+}
+
+
+
+function keyPressed() {
+
+    // if(key == 'e') {
+    //     // eraseAll();
+    // } else if(key == 'd') {
+    //     // addClutterNearMouse();
+    // } else if(key == 'c') {
+    //     // addClutterToPath();
+    // }
+}
+
+var rectStartX = null;
+var rectStartY = null;
+var mouseIsDown = false;
+
+function mousePressed() {
+
+    if(state == State.showImage || state == State.drawRect) {
+        if(mouseX >= 0 && mouseY >= 0 && mouseX < width && mouseY < height) {
+            rectStartX = mouseX;
+            rectStartY = mouseY;
+
+            mouseIsDown = true;
+        }
+    }
+}
+
+function mouseReleased() {
+
+    if(mouseIsDown == true) {
+
+        if(mouseX >= 0 && mouseY >= 0 && mouseX < width && mouseY < height) {
+            rectEndX = mouseX;
+            rectEndY = mouseY;
+            
+            state = State.drawRect;
+        } else {
+            rectStartX = null;
+            rectStartY = null;
+        }
+        mouseIsDown = false;
+    }
+}
+
+</script>

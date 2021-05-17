@@ -7,6 +7,7 @@ import ipdb
 
 
 if __name__ == '__main__':
+    
     # setup tracker
     net_path = 'pretrained/siamfc/model.pth'
     tracker = TrackerSiamFC(net_path=net_path)
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     # tracker.track(img_files, anno[0, :], visualize=False)
 
     print(box)
-    
+
     for f, image_file in enumerate(image_files):
 
         box = tracker.trackOne(image_file, box, f, visualize=False)

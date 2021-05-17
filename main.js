@@ -12,7 +12,9 @@ const sot = require('./sot');
 const rls = require('./rls');
 const lite_ids = require('./lite_ids');
 const a_star = require('./a_star');
+const siamfc = require('./siamfc');
 const detectron_tracking = require('./detectron_tracking');
+
 
 
 let win;
@@ -46,24 +48,18 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	console.log(addr);
 
-	if(lastPage === 'rls.ejs') {
+	if(lastPage === 'rls.ejs')						rls.deactivate();
 
-		rls.deactivate();
+	else if(lastPage == 'sot.ejs')					sot.deactivate();
 
-	} else if(lastPage == 'sot.ejs') {
+	else if(lastPage === 'detectron_tracking.ejs') 	detectron_tracking.deactivate();
 
-		sot.deactivate();
+	else if(lastPage === 'lite_ids.ejs') { }
 
-	} else if(lastPage === 'detectron_tracking.ejs') {
+	else if(lastPage === 'a_star.ejs')				a_star.deactivate();
 
-		detectron_tracking.deactivate();
+	else if(lastPage === 'siamfc.ejs') 				siamfc.deactivate();
 
-	} else if(lastPage === 'lite_ids.ejs') {
-
-	} else if(lastPage === 'a_star') {
-
-		a_star.deactivate();
-	}
 
 	if(addr === 'rls.ejs') {
 
@@ -89,6 +85,11 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 		a_star.init(win);
 		win.loadFile('front_end/a_star.ejs');
+
+	} else if(addr === 'siamfc.ejs') {
+
+		siamfc.init(win);
+		win.loadFile('front_end/siamfc.ejs')
 
 	}
 

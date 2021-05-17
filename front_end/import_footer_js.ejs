@@ -13,7 +13,11 @@
   <script src="lib/jquery-ui-1.9.2.custom.min.js"></script>
   <script type="text/javascript" src="lib/bootstrap-fileupload/bootstrap-fileupload.js"></script>
   <script src="lib/p5/p5.js"></script>
-  <!--script for this page-->
+  
+  <script src="lib/toast_flash/flash-messenger.js"></script>
+  <script src="lib/toast_flash/jquery.toastmessage-min.js"></script>
+
+
 
 <script>if (window.module) module = window.module;</script>
 
@@ -43,16 +47,29 @@
   const electron = require('electron');
   const { ipcRenderer } = electron;
 
+
+  function showFlashMessage(message, message_type) {
+      
+      flash(message, {
+        type: message_type, // $('#type').val(),
+        sticky: false, // $('#sticky').is(':checked'),
+        closable: true, // $('#closable').is(':checked')
+      });
+    }
+
+
+
   $(document).ready(function() {
 
-      $("a.sidebar_item").click(function(){
 
-        // console.log("Clicked")
-        var href = $(this).attr('href');
-        ipcRenderer.send('menu:page:change', href)
-        // console.log(href);
+    $("a.sidebar_item").click(function(){
 
-      })
+      // console.log("Clicked")
+      var href = $(this).attr('href');
+      ipcRenderer.send('menu:page:change', href)
+      // console.log(href);
+
+    })
 
   })
 
