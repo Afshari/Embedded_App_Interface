@@ -9,6 +9,8 @@ __pycache__
 siamfc/output/*
 siamfc/data/*
 siamfc/results/*
+detectron_siamfc/data/*
+detectron_siamfc/output/*
 
 #files
 *.tgz
