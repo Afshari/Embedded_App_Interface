@@ -1,7 +1,7 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
 const  fs = require('fs');
-const  net = require('net')
+const  net = require('net');
 
 
 let mainWindow;
@@ -85,7 +85,6 @@ ipcMain.on('siamfc:send:step', (event, dataset_idx, run_type) => {
         client.write(`101:${stepIndex}:${dataset_idx}:${run_type}`);
         stepIndex += 1;
     }
-
 
 })
 

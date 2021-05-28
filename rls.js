@@ -28,13 +28,6 @@ function init(win) {
 	_isActive = true
 }
 
-// function exitApp() {
-
-//     if(_isActive == true) {
-//         deactivate();
-//     }
-// }
-
 
 function deactivate() {
     _isActive = false;

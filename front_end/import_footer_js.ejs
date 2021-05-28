@@ -14,8 +14,10 @@
   <script type="text/javascript" src="lib/bootstrap-fileupload/bootstrap-fileupload.js"></script>
   <script src="lib/p5/p5.js"></script>
   
-  <script src="lib/toast_flash/flash-messenger.js"></script>
-  <script src="lib/toast_flash/jquery.toastmessage-min.js"></script>
+  <!-- <script src="lib/toast_flash/flash-messenger.js"></script> -->
+  <!-- <script src="lib/toast_flash/jquery.toastmessage-min.js"></script> -->
+  <script type="text/javascript" src="lib/gritter/js/jquery.gritter.js"></script>
+  <script type="text/javascript" src="lib/gritter-conf.js"></script>
 
 
 
@@ -49,13 +51,25 @@
 
 
   function showFlashMessage(message, message_type) {
-      
-      flash(message, {
-        type: message_type, // $('#type').val(),
-        sticky: false, // $('#sticky').is(':checked'),
-        closable: true, // $('#closable').is(':checked')
-      });
-    }
+
+    var img_url = "";
+    if(message_type === "WARNING")
+      img_url = 'img/warning.png'
+    else if(message_type === "INFO")
+      img_url = 'img/info.png'
+    else if(message_type === "ERROR")
+      img_url = 'img/error.png'
+
+
+    $.gritter.add({
+        title: message_type,
+        text: message,
+        class_name: 'gritter-light',
+        image: img_url
+    });
+
+
+  }
 
 
 

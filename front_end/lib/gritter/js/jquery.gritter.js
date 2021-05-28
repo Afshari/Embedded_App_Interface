@@ -20,7 +20,7 @@
 	* Set up global options that the user can over-ride
 	*/
 	$.gritter.options = {
-		position: 'bottom-right',
+		// position: 'bottom-right',
 		class_name: '', // could be set to 'gritter-light' to use white notifications
 		fade_in_speed: 1000, // how fast notifications fade in
 		fade_out_speed: 1000, // how fast the notices fade out

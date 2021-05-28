@@ -23,7 +23,7 @@
       sticky: false,
       fadeOut: 1000,
       closable: true,
-      scrollTo: true,
+      scrollTo: false,
       html: false
     },
     typesDefault: {

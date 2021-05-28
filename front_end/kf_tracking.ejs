@@ -1,0 +1,634 @@
+<%- include('./import_above_content.ejs', { Title: "Tracking with Kalman Filter", PageAddr: 'kf_tracking' } ) %>
+
+
+<!-- INLINE FORM ELELEMNTS -->
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Kalman Parameters</h4>
+
+        <div class="row mt">
+            <div class="col-lg-8">
+                <div class="form-inline" role="form" class="col-sm-6">
+                    <div class="form-group">
+                        <input class="form-control" id="init_x" placeholder="Initial x Value">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="init_y" placeholder="Initial y Value">
+                    </div>
+                    <button class="btn btn-theme" id="btnInitial">Add Initial x & y with Mouse Click</button>
+                </div>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form" class="col-sm-6">
+                    <div class="form-group">
+                        <input class="form-control" id="std_x" placeholder="Std in x-direction">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="std_y" placeholder="Std in y-direction">
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form">
+                    <div class="form-group">
+                        <input class="form-control" id="dt" placeholder="dt">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="process_noise" placeholder="Process Noise Magnitude">
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="connection_type" style="padding-left: 0px;">
+                        <option value="uart">UART</option>
+                        <option value="tcp">TCP/IP</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="uart_select" style="padding-left: 0px;">
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
+            </div>
+        </div>
+
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-theme" id="btnResetAll">Reset All</button>
+    <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+    <button type="button" class="btn btn-primary" id="btnResetCurrent" >Reset Current Path</button>
+    <button type="button" class="btn btn-primary" id="btnPause" >Pause</button>
+    <button type="button" class="btn btn-primary" id="btnStep" >Step</button>
+
+</div>
+
+<main>
+</main>
+
+
+<%- include('./import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
+var Enum = require('enum')
+
+var State = new Enum( { 
+
+    'ready': 1,
+    'pause': 2,
+    'drawData': 3,
+    'addData': 4,
+    'addInitial': 5,
+    'running': 7,
+    'step': 8
+
+} )
+
+var state = State.ready;
+var lastState = State.ready;
+
+const windowWidth = 900;
+const windowHeight = 600;
+var kfResults = []
+
+var groundTruthX = 0
+var groundTruthY = 0
+const CLUTTER_PER_STEP = 1;
+
+var init_x = 0;
+var init_y = 0;
+var std_x  = 0.1;
+var std_y  = 0.1;
+var process_noise  = 1;
+var dt  = 0.1;
+var connection_type = "";
+var uart = "";
+
+
+// const matrix = Matrix.ones(5, 5);
+
+var HH = new Matrix([ [1., 0., 0., 0.],
+                      [0., 1., 0., 0.] ])
+
+
+var arrayMaxIndex = function(array) {
+  return array.indexOf(Math.max.apply(null, array));
+};
+var arrayMinIndex = function(array) {
+  return array.indexOf(Math.min.apply(null, array));
+};
+
+
+function getWidthHeightOrient(covar, HH) {
+
+    var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
+    var w = e.realEigenvalues;
+    // console.log(w)
+    var v = e.eigenvectorMatrix;
+    // console.log(v)
+    max_ind = arrayMaxIndex(w)
+    min_ind = arrayMinIndex(w)
+
+    var width  = 2 * Math.sqrt(w[max_ind])
+    var height = 2 * Math.sqrt(w[min_ind])
+
+    var orientation = Math.atan2( v.data[1][max_ind], v.data[0][max_ind])
+    
+    return { width: width, height: height, orientation: orientation }
+}
+
+
+
+$(document).ready( () => {
+
+    const { ipcRenderer } = require('electron')
+
+    ipcRenderer.on('kf_tracking:result', (event, x, y) => {
+        kfResults.push([x, y])
+    })
+
+    $("#btnResetAll").click(function() {
+        eraseAll();
+        state = State.ready;
+        frameRate(30);
+    })
+
+    $("#btnMeasure").click(function() {
+
+        if(state == State.drawData) {
+
+            if(points.length > 0)
+                addMeasurementToPath();
+            else
+                showFlashMessage('First You have to Draw Path', 'WARNING');
+        } else {
+            showFlashMessage('Make Sure to Draw Path First', 'WARNING');
+        }
+    })
+
+    $("#btnInitial").click(function() {
+
+        if(state == State.drawData) {
+
+            lastState = State.drawData;
+            state = State.addInitial;
+
+        } else if(state == State.ready) {
+
+            lastState = State.ready;
+            state = State.addInitial;
+
+        } else if(state == State.running) {
+            showFlashMessage('Already Running', 'INFO');
+        }
+    })
+
+    $("#btnRun").click(function() {
+
+        if(state == State.running) {
+
+            showFlashMessage('Already Running', 'INFO');
+
+        } else if(state == State.drawData &&  pathMeasurements.length > 0) {
+            
+            init_x = $("#init_x").val() != "" ? $("#init_x").val() : 0;
+            init_y = $("#init_y").val() != "" ? $("#init_y").val() : 0;
+            std_x  = $("#std_x").val()  != "" ? $("#std_x").val()  : 0.1;
+            std_y  = $("#std_y").val()  != "" ? $("#std_y").val()  : 0.1;
+            process_noise  = $("#process_noise").val() != "" ? $("#process_noise").val() : 1;
+            dt  = $("#dt").val() != "" ? $("#dt").val() : 0.1;
+
+            params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
+
+            connection_type = $("#connection_type").val();
+            if(connection_type === "uart") {
+                uart = $("#uart_select").val();
+                ipcRenderer.send('kf_tracking:uart:send:measurements', 100, uart, params)
+                // ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[0]);
+                frameRate(4);
+                state = State.running;
+
+            } else if(connection_type === "tcp") {
+                ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+                frameRate(4);
+                state = State.running;
+            }
+
+        } else if(state == State.pause || state == State.step) {
+            frameRate(4);
+            state = State.running;
+        } 
+        
+        
+        else if(points.length == 0) {
+            showFlashMessage('First You have to Draw Path', 'WARNING');
+        } else {
+            showFlashMessage('You have to Add Measurements', 'WARNING');
+        }
+    })
+
+    $("#btnResetCurrent").click(function() {
+
+        if(state == State.running || state == State.step) {
+            kfResults = [];
+            stepPointer = 0;
+            state = State.drawData;
+            frameRate(30);
+        } else if(state == State.pause) {
+            showFlashMessage('Algorithm is not Running', 'WARNING');
+        }
+    })
+
+    $("#btnPause").click(function() {
+        if(state == State.running) {
+            state = State.pause;
+        }
+    })
+
+    $("#btnStep").click(function() {
+
+        if(state == State.drawData &&  pathMeasurements.length > 0) {
+            
+            init_x = $("#init_x").val() != "" ? $("#init_x").val() : 0;
+            init_y = $("#init_y").val() != "" ? $("#init_y").val() : 0;
+            std_x  = $("#std_x").val()  != "" ? $("#std_x").val()  : 0.1;
+            std_y  = $("#std_y").val()  != "" ? $("#std_y").val()  : 0.1;
+            process_noise  = $("#process_noise").val() != "" ? $("#process_noise").val() : 1;
+            dt  = $("#dt").val() != "" ? $("#dt").val() : 0.1;
+
+            params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
+
+            connection_type = $("#connection_type").val();
+            if(connection_type === "uart") {
+                uart = $("#uart_select").val();
+                ipcRenderer.send('kf_tracking:uart:send:measurements', 100, uart, params);
+                // ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[0]);
+                frameRate(4);
+                state = State.step;
+
+            } else if(connection_type === "tcp") {
+                ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+                frameRate(4);
+                state = State.step;
+            }
+
+        } else if(state == State.step) {
+
+            if(stepPointer < points.length - 1) {
+
+                stepPointer += 1;
+
+                if(connection_type === "uart") {
+
+                    ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[stepPointer]);
+
+                } else if(connection_type === "tcp") {
+
+                    ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+                }
+            } else {
+                showFlashMessage('There is not Data for Tracking', 'WARNING');
+            }
+        }
+    })
+
+
+    // Load UART on Page Load
+    ipcRenderer.send('uart:reload');
+
+        // Load UART on Reload Button Click
+    $("#reloadUart").click( (event) => {
+        // console.log(event)
+        ipcRenderer.send('uart:reload');
+    });
+
+    ipcRenderer.on('uart:data', (event, ports) => {
+        $('#uart_select').find('option').remove();
+        ports.forEach(function(port){
+            $("#uart_select").append(new Option(port['path'], port['path']));
+        });
+    });
+
+
+});
+
+let scl = 20;
+var stepPointer = 0;
+
+function moveX(x) {
+    return windowWidth/2 + (x * scl)
+}
+
+function moveY(y) {
+    return windowHeight  - (y * scl) - 10
+}
+
+var shouldDraw = false
+var points = []
+var clutters = []
+var pathMeasurements = []
+
+// let measurementColor = [ 0, 255, 255, 170 ]
+let measurementColor = [ 0, 0, 0, 170 ]
+let groundtruthColor = [ 0, 0, 255, 255 ]
+let estimatedMeanColor = [ 255, 140, 0, 255 ]
+let estimatedCovarColor = [ 255, 0, 0, 90 ]
+let measurementCircleRadius = 5
+
+function drawLegends() {
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Measurements', 40, 30)
+    text('Ground Truth', 40, 50)
+    text('Estimated Mean', 40, 70)
+    // text('Estimated Covariance', 40, 90)
+
+
+    text(`Initial State: ${init_x}, ${init_y}`, windowWidth-120, 30);
+    text(`Initial Std: ${std_x}, ${std_y}`, windowWidth-120, 50);
+    text(`Process Noise: ${process_noise}`, windowWidth-120, 90);
+    text(`dt: ${dt}`, windowWidth-120, 70);
+    
+
+    noStroke()
+    fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    circle(20, 30, measurementCircleRadius*2)
+
+    fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    circle(20, 50, measurementCircleRadius)
+    stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    strokeWeight(1.5)
+    line(10, 50, 30, 50)
+
+    noStroke()
+    fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    circle(20, 70, measurementCircleRadius*2)
+
+}
+
+function drawBackground() {
+
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, windowWidth, windowHeight);
+}
+
+
+function setup() {
+    
+    createCanvas(windowWidth, windowHeight)
+    
+    drawBackground()
+
+    drawLegends()
+
+    stroke(0)
+    strokeWeight(2)
+    frameRate(30);
+}
+
+
+function draw() {    
+    
+
+    drawBackground()
+    drawLegends()
+
+    if( state == State.addData &&  isInCanvas() ) {
+
+        var canAddPoint = true
+        points.forEach(function(p, index, array) {
+            if(dist(mouseX, mouseY, p[0], p[1]) < 10 )
+                canAddPoint = false
+        })
+
+        if(canAddPoint == true)
+            points.push( [mouseX, mouseY] )
+    }
+
+    if(state == State.drawData || state == State.addData || state == State.addInitial) {
+
+        points.forEach(function(item, index, array) {
+
+            fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            circle(item[0], item[1], 3)
+            
+            if(index > 0) {
+                fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+                line(item[0], item[1], array[index - 1][0], array[index - 1][1])
+            }
+        })
+
+        pathMeasurements.forEach(function(item, index, array) {
+
+            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+
+            circle(item[0], item[1], 3)
+        })
+
+    } else if(state == State.running || state == State.step) {
+
+        for(var index = 0; index < stepPointer; index++) {
+
+            var item = points[index];
+            fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+            circle(item[0], item[1], 3)
+
+            if(index > 0) {
+                line(item[0], item[1], points[index - 1][0], points[index - 1][1])
+            }
+        }
+
+        measurement = []
+
+        for(var index = 0; index < stepPointer && index < pathMeasurements.length; index++) {
+
+            var item = pathMeasurements[index];
+
+            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+
+            circle(item[0], item[1], 3);
+
+            if(index == stepPointer - 1)
+                measurement = item;
+        }
+
+        
+        if(state == State.running && stepPointer < points.length - 1) {
+            // console.log(measurement.length)
+            
+            if(measurement.length != 0) {
+                if(connection_type === "tcp")
+                    ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, measurement)
+                else if(connection_type === "uart")
+                    ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, measurement)
+            }
+
+            stepPointer += 1;
+            // state = State.step;
+        }
+
+        kfResults.forEach(function(currObj, index, array) {
+
+            stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+            fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+            var x = currObj[0]
+            var y = currObj[1]
+            circle(x, y, 5)
+
+            if(index > 0) {
+                line(x, y, kfResults[index - 1][0], kfResults[index - 1][1])
+            }
+        })
+
+    }    
+
+
+    //     // Draw Estimated Mean
+    //     noStroke()
+    //     fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    //     let x = moveX(objToDraw['x']) 
+    //     let y = moveY(objToDraw['y']) 
+    //     circle(x, y, 5)
+
+
+    //     // Draw GroundTruth
+    //     stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //     strokeWeight(1.5)
+
+    //     if(index > 0) {
+    //         line(moveX(array[index - 1]['truthX']), moveY(array[index - 1]['truthY']), 
+    //             moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
+    //     }
+
+    //     circle(moveX(objToDraw['truthX']), moveY(objToDraw['truthY']), 2)
+                
+
+    //     // Calculate Covariance
+    //     var strCovar = objToDraw['covar'].split(',')
+        
+    //     var covar = Matrix.zeros(4, 4);
+    //     for(var i = 0; i < covar.rows; i++) {
+    //         for(var j = 0; j < covar.columns; j++) {
+    //             covar.set(i, j, parseFloat(strCovar[ (i * 4) + j]))
+    //         }
+    //     }
+        
+    //     // Draw Ellipse (Covariance)
+    //     fill(255, 0, 0, 90)
+    //     var uncertainty = getWidthHeightOrient(covar, HH)
+
+    //     push();
+    //         translate(x, y);
+    //         rotate(-uncertainty.orientation)
+    //         noStroke()
+    //         ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
+    //     pop();
+
+    //     var strMeasurements = objToDraw['measurements'].split(':')
+
+    //     if(strMeasurements.length > 2) {
+
+    //         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         for(var i = 1; i < strMeasurements.length; i+=3) {
+    //             var state = strMeasurements[i + 2].split(',')
+
+    //             let measX = moveX(state[0])
+    //             let measY = moveY(state[1])
+
+    //             noStroke()
+    //             circle(measX, measY, measurementCircleRadius)
+    //         }
+    //     }
+    // })
+
+}
+
+function eraseAll() {
+
+    points = [];
+    // clutters = [];
+    pathMeasurements = [];
+    kfResults = [];
+    // state = State.pause;
+    stepPointer = 0;
+}
+
+function addMeasurementToPath() {
+
+    pathMeasurements = []
+    points.forEach(function(p, index, array) {
+        pathMeasurements.push( [ parseInt( p[0] + random(-10, 10) ), parseInt( p[1] + random(-10, 10) ) ] )
+    })
+}
+
+function isInCanvas() {
+
+    return  mouseX >= 0 && mouseX <= width &&
+            mouseY >= 0 && mouseY <= height;
+}
+
+
+function mousePressed() {
+
+    if( isInCanvas() ) { 
+        
+        if(state == State.ready)
+            state = State.drawData;
+
+        if(state == State.drawData) {
+
+            eraseAll();
+            state = State.addData;
+
+        } else if(state == State.addInitial) {
+
+            $("#init_x").val(mouseX);
+            $("#init_y").val(mouseY);
+            state = lastState;
+        }
+    }
+}
+
+function mouseReleased() {
+
+    if(state == State.addData)
+        state = State.drawData;
+}
+
+</script>

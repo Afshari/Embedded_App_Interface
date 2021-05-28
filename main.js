@@ -13,6 +13,7 @@ const rls = require('./rls');
 const lite_ids = require('./lite_ids');
 const a_star = require('./a_star');
 const siamfc = require('./siamfc');
+const kf_tracking = require('./kf_tracking');
 const detectron_tracking = require('./detectron_tracking');
 
 
@@ -49,16 +50,12 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	console.log(addr);
 
 	if(lastPage === 'rls.ejs')						rls.deactivate();
-
 	else if(lastPage == 'sot.ejs')					sot.deactivate();
-
 	else if(lastPage === 'detectron_tracking.ejs') 	detectron_tracking.deactivate();
-
 	else if(lastPage === 'lite_ids.ejs') { }
-
 	else if(lastPage === 'a_star.ejs')				a_star.deactivate();
-
 	else if(lastPage === 'siamfc.ejs') 				siamfc.deactivate();
+	else if(lastPage === 'kf_tracking.ejs')			kf_tracking.deactivate();
 
 
 	if(addr === 'rls.ejs') {
@@ -90,6 +87,11 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 		siamfc.init(win);
 		win.loadFile('front_end/siamfc.ejs')
+ 
+	} else if(addr === 'kf_tracking.ejs') {
+
+		kf_tracking.init(win);
+		win.loadFile('front_end/kf_tracking.ejs');
 
 	}
 
