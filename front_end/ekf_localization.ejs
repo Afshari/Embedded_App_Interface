@@ -1,0 +1,762 @@
+<%- include('./import_above_content.ejs', { Title: "Localization with Extended Kalman Filter", PageAddr: 'ekf_localization' } ) %>
+
+
+<!-- INLINE FORM ELELEMNTS -->
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Kalman Parameters</h4>
+
+        <div class="row mt">
+            <div class="col-lg-8">
+                <div class="form-inline" role="form" class="col-sm-6">
+                    <div class="form-group">
+                        <input class="form-control" id="init_x" placeholder="Initial x Value">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="init_y" placeholder="Initial y Value">
+                    </div>
+                    <button class="btn btn-theme" id="btnInitial">Add Initial x & y with Mouse Click</button>
+                </div>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form" class="col-sm-6">
+                    <div class="form-group">
+                        <input class="form-control" id="std_x" placeholder="Std in x-direction">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="std_y" placeholder="Std in y-direction">
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="row mt">
+            <div class="col-lg-8">
+                <form class="form-inline" role="form">
+                    <div class="form-group">
+                        <input class="form-control" id="dt" placeholder="dt">
+                    </div>
+                    <div class="form-group">
+                        <input class="form-control" id="process_noise" placeholder="Process Noise Magnitude">
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="connection_type" style="padding-left: 0px;">
+                        <option value="uart">UART</option>
+                        <option value="tcp">TCP/IP</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="uart_select" style="padding-left: 0px;">
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
+            </div>
+        </div>
+
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-theme" id="btnResetAll">Reset All</button>
+    <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+    <button type="button" class="btn btn-primary" id="btnResetCurrent" >Reset Current Path</button>
+    <button type="button" class="btn btn-primary" id="btnPause" >Pause</button>
+    <button type="button" class="btn btn-primary" id="btnStep" >Step</button>
+
+</div>
+
+<canvas class="webgl" id="threejs_canvas"> 
+</canvas>
+
+
+<%- include('./import_below_content.ejs') %>
+
+<!-- <script src="../ekf_localization/smoothie.js"></script> -->
+<script type="text/javascript">
+
+const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
+var Enum = require('enum');
+const THREE = require('three');
+
+require('../ekf_localization/GLTFLoader');
+require('../ekf_localization/OrbitControls');
+require('../ekf_localization/RoomEnvironment');
+let CANNON = require('../ekf_localization/cannon');
+require('../ekf_localization/cannon.demo');
+// require('../ekf_localization/smoothie');
+require('../ekf_localization/Detector');
+
+
+const dat = require('dat.gui');
+const gui = new dat.GUI();
+
+// dummy variables
+params = { x: 1, y: 1, z: 1, w: 1, t: 1, f: 1 }
+gui.add(params, 'x').min(1).max(50).step(1);
+gui.add(params, 'y').min(1).max(50).step(1);
+
+
+const Stats = require('stats-js');
+var stats = new Stats();
+stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild( stats.dom );
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color( 0xcce0ff );
+// scene.fog = new THREE.Fog( 0xcce0ff, 10, 50 );
+scene.fog = new THREE.Fog( 0xcce0ff, 6000, 80000 );
+
+const loader = new THREE.GLTFLoader();
+
+const canvas = document.querySelector("canvas.webgl");
+
+// const world = new CANNON.World();
+// var demo = new CANNON.Demo(world, scene);
+// var mass = 150;
+
+// world.gravity.set(0, - 9.82 * 1000, 0);
+
+// demo.start();
+
+
+const objectsToUpdate = []
+
+// Default material
+const defaultMaterial = new CANNON.Material('default')
+const defaultContactMaterial = new CANNON.ContactMaterial(
+    defaultMaterial,
+    defaultMaterial,
+    {
+        friction: 0.1,
+        restitution: 0
+    }
+)
+// world.defaultContactMaterial = defaultContactMaterial
+
+// Floor
+const floorShape = new CANNON.Plane()
+const floorBody = new CANNON.Body()
+floorBody.mass = 0
+floorBody.addShape(floorShape)
+floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5) 
+// world.addBody(floorBody)
+
+const textureLoader = new THREE.TextureLoader();
+// const groundTexture = textureLoader.load( '../ekf_localization/textures/terrain/grasslight-big.jpg' );
+const groundTexture = textureLoader.load( '../ekf_localization/textures/granite_seamless_gravel.jpg' );
+groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+groundTexture.repeat.set( 60, 60 );
+groundTexture.anisotropy = 500;
+groundTexture.encoding = THREE.sRGBEncoding;
+
+const groundMaterial = new THREE.MeshLambertMaterial( { map: groundTexture } );
+
+/**
+ * Floor
+*/
+// let floor = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), groundMaterial );
+let floor = new THREE.Mesh( new THREE.PlaneGeometry( 120000, 120000 ), groundMaterial );
+// floor.position.y = - 250;
+floor.rotation.x = - Math.PI / 2;
+floor.receiveShadow = true;
+scene.add( floor );
+
+
+
+// Create box
+const boxGeometry = new THREE.BoxBufferGeometry(1, 1, 1)
+const boxMaterial = new THREE.MeshStandardMaterial({
+    metalness: 0.3,
+    roughness: 0.4
+})
+const createBox = (width, height, depth, position) => {
+    // Three.js mesh
+    const mesh = new THREE.Mesh(boxGeometry, boxMaterial)
+    mesh.scale.set(width, height, depth)
+    mesh.castShadow = true
+    mesh.position.copy(position)
+    scene.add(mesh)
+
+    // Cannon.js body
+    const shape = new CANNON.Box(new CANNON.Vec3(width * 0.5, height * 0.5, depth * 0.5))
+
+    const body = new CANNON.Body({
+        mass: 0,
+        position: new CANNON.Vec3(0, 3, 0),
+        shape: shape,
+        material: defaultMaterial
+    })
+    body.position.copy(position)
+    // body.addEventListener('collide', playHitSound)
+    // world.addBody(body)
+
+    // Save in objects
+    objectsToUpdate.push({ mesh, body })
+}
+
+// createBox(500, 700, 500, { x: 1000, y: 0, z: 1000 })
+// createBox(500, 700, 500, { x: -1000, y: 0, z: 1000 })
+
+
+
+var State = new Enum( { 
+
+    'ready': 1,
+    'pause': 2,
+    'drawData': 3,
+    'addData': 4,
+    'addInitial': 5,
+    'running': 7,
+    'step': 8
+
+} )
+
+var state = State.ready;
+var lastState = State.ready;
+
+const windowWidth = 900;
+const windowHeight = 600;
+
+
+
+    // var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 150000 );
+    camera.position.set( 6000, 1000, 250 );
+
+
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas });
+
+    const pmremGenerator = new THREE.PMREMGenerator( renderer );
+    scene.environment = pmremGenerator.fromScene( new THREE.RoomEnvironment(), 0.4 ).texture;
+
+    renderer.setSize(windowWidth, windowHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+
+    renderer.shadowMap.enabled = true;
+
+
+
+    // var light = new THREE.SpotLight( 0xffffff );
+    // light.position.set( 30, 30, 40 );
+    // light.target.position.set( 0, 0, 0 );
+
+    // light.castShadow = true;
+
+    // light.shadowCameraNear = 10;
+    // light.shadowCameraFar = 100;//camera.far;
+    // light.shadowCameraFov = 30;
+
+    // light.shadowMapBias = 0.0039;
+    // light.shadowMapDarkness = 0.5;
+    // light.shadowMapWidth = SHADOW_MAP_WIDTH;
+    // light.shadowMapHeight = SHADOW_MAP_HEIGHT;
+
+
+    // renderer.setClearColor( 0x777777 );
+
+    // var geometry = new THREE.BoxGeometry(1, 1, 1);
+    // var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    // var cube = new THREE.Mesh(geometry, material);
+    // scene.add(cube);
+
+    // const material = new THREE.MeshStandardMaterial({ color: 0xffffff })
+    // material.roughness = 0.4
+    // const plane = new THREE.Mesh(
+    //     new THREE.PlaneBufferGeometry(15, 15),
+    //     material
+    // )
+    // plane.rotation.x = - Math.PI * 0.5
+    // scene.add(plane);
+
+
+    let car = null;
+    loader.load( '../ekf_localization/gmc_sierra_work_truck/scene.gltf', function ( gltf ) {
+
+        gltf.scene.rotation.y = Math.PI/2;
+        // gltf.scene.position.y = 100;
+        gltf.scene.scale.set(14, 14, 14);
+        // scene.add( gltf.scene );
+        car = gltf.scene;
+        scene.add(car);
+
+    }, undefined, function ( error ) {
+        console.error( error );
+    } );
+
+    function addCube(cube, x, z, y=300) {
+        cube.position.x = x
+        cube.position.y = y
+        cube.position.z = z
+        scene.add(cube);
+    }
+
+
+    let cube_1 = null;
+    let cube_2 = null;
+    let cube_1_arr = null;
+    loader.load( '../ekf_localization/dirty_brick_mats/scene.gltf', function ( gltf ) {
+
+        gltf.scene.rotation.y = Math.PI/2;
+
+        cube_1 = gltf.scene.children[0].children[0].children[0].children[0];
+        cube_2 = gltf.scene.children[0].children[0].children[0].children[1];
+
+        cube_1.scale.set(3, 3, 3);
+        cube_1.position.y = 300;
+        cube_2.scale.set(10, 10, 10);
+        // cube_2.position.x = 1500;
+        cube_2.position.y = 300;
+
+        var cube_1_1 = cube_1.clone();
+        var cube_1_2 = cube_1.clone();
+        var cube_1_3 = cube_1.clone();
+        var cube_1_4 = cube_1.clone();
+
+        addCube(cube_1_1, 10000, 6000);        
+        addCube(cube_1_2, 10000, 6550);
+        addCube(cube_1_3, 10000, 7100);
+        addCube(cube_1_4, 10000, 6700, 800);
+
+        gui.add(cube_1_1.position, 'x').min(-10000).max(10000).step(1).name('Cube 1 x');
+        gui.add(cube_1_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+
+        addCube(cube_2.clone(), 9000, -9000, 1000);
+        // addCube(cube_2.clone(), -5000, 10000);
+        // addCube(cube_2.clone(), -5000, -12000);
+
+    }, undefined, function ( error ) {
+        console.error( error );
+    } );
+
+    loader.load( '../ekf_localization/concrete_block_low_poly/scene.gltf', function ( gltf ) {
+
+        // gltf.scene.rotation.y = Math.PI/2;
+        
+        var bx = gltf.scene;
+        bx.scale.set(1000, 1000, 1000);
+        
+        var cube_1 = gltf.scene.clone();
+        var cube_2 = gltf.scene.clone();
+        var cube_3 = gltf.scene.clone();
+
+        addCube(cube_1, -9000, -6000, 500);
+        addCube(cube_2, -9000, -10000, 500);
+        addCube(cube_3, -9000, -8000, 500);
+
+        gui.add(cube_1.position, 'y').min(0).max(10000).step(1).name('Cube 1 y');
+        gui.add(cube_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+
+    }, undefined, function ( error ) {
+        console.error( error );
+    } );
+
+    loader.load( '../ekf_localization/concrete_road_divider__game/scene.gltf', function ( gltf ) {
+
+        gltf.scene.rotation.y = Math.PI/2;
+        
+        var bx = gltf.scene;
+        bx.scale.set(2000, 2000, 2000);
+        
+        var cube_1 = gltf.scene.clone();
+        var cube_2 = gltf.scene.clone();
+        var cube_3 = gltf.scene.clone();
+        var cube_4 = gltf.scene.clone();
+        var cube_5 = gltf.scene.clone();
+
+        addCube(cube_1, -5000, 10000, 0);
+        addCube(cube_2, -3400, 10000, 0);
+        addCube(cube_3, -6600, 10000, 0);
+        addCube(cube_4, -8200, 10000, 0);
+        addCube(cube_5, -1800, 10000, 0);
+
+        
+
+    }, undefined, function ( error ) {
+        console.error( error );
+    } );
+
+
+    let wall_1 = null;
+    loader.load( '../ekf_localization/damaged_wall/scene.gltf', function ( gltf ) {
+
+        gltf.scene.rotation.y = Math.PI/2;
+
+        wall = gltf.scene;
+
+        for(var i = 0; i < 16; i++) {
+
+            let wall_back = wall.clone();
+            wall_back.scale.set(10, 10, 10);
+            wall_back.position.set(16000, 0, (i*2000)-16000);
+            scene.add(wall_back)
+
+            let wall_front = wall.clone();
+            wall_front.scale.set(10, 10, 10);
+            wall_front.position.set(-16000, 0, (i*2000)-16000);
+            scene.add(wall_front)
+
+            let wall_left = wall.clone();
+            wall_left.rotation.y = Math.PI;
+            wall_left.scale.set(10, 10, 10);
+            wall_left.position.set((i*2000)-15000, 0, 15000);
+            scene.add(wall_left)
+
+
+            let wall_right = wall.clone();
+            wall_right.rotation.y = Math.PI;
+            wall_right.scale.set(10, 10, 10);
+            wall_right.position.set((i*2000)-15000, 0, -17000);
+            scene.add(wall_right)
+
+        }
+
+        // gui.add(wall_1.position, 'x').min(0).max(10000).step(1).name('Wall 1 x');
+        // gui.add(wall_1.position, 'y').min(0).max(10000).step(1).name('Wall 1 y');
+        // gui.add(wall_1.position, 'z').min(0).max(10000).step(1).name('Wall 1 z');
+
+    }, undefined, function ( error ) {
+        console.error( error );
+    } );    
+
+
+    const sphereSize = 1;
+
+
+    var ambient = new THREE.AmbientLight( 0x666666 );
+    scene.add( ambient );
+
+    const light = new THREE.DirectionalLight( 0xdfebff, 1 );
+    light.position.set( 50, 200, 100 );
+    light.position.multiplyScalar( 1.3 );
+
+    light.castShadow = true;
+
+    light.shadow.mapSize.width = 1024;
+    light.shadow.mapSize.height = 1024;
+
+    const d = 300;
+
+    light.shadow.camera.left = - d;
+    light.shadow.camera.right = d;
+    light.shadow.camera.top = d;
+    light.shadow.camera.bottom = - d;
+
+    light.shadow.camera.far = 1000;
+
+    scene.add( light );
+
+
+    const controls = new THREE.OrbitControls(camera, canvas)
+    // controls.target.y = 2
+    // controls.enableDamping = true
+    controls.maxPolarAngle = Math.PI * 0.45;
+    controls.minPolarAngle = Math.PI * 0.2;
+    // controls.minDistance = 1000;
+    controls.minDistance = 10;
+    controls.maxDistance = 25000;
+
+
+    var demo = new CANNON.Demo(scene, light, camera, controls, renderer, ambient);
+
+    console.log('Sphere', CANNON.Shape.types.SPHERE)
+    console.log('Particle', CANNON.Shape.types.PARTICLE)
+    console.log('Plane', CANNON.Shape.types.PLANE)
+    console.log('Box', CANNON.Shape.types.BOX)
+    console.log('CONVEXPOLYHEDRON', CANNON.Shape.types.CONVEXPOLYHEDRON)
+    console.log('HEIGHTFIELD', CANNON.Shape.types.HEIGHTFIELD)
+    console.log('Trimesh', CANNON.Shape.types.TRIMESH)
+    console.log('--------------')
+
+
+    var mass = 150;
+    var vehicle;
+    demo.addScene(function() {
+
+        var world = demo.getWorld();
+        world.broadphase = new CANNON.SAPBroadphase(world);
+        // world.gravity.set(0, 0, -10);
+        world.gravity.set(0, -100, 0);
+        world.defaultContactMaterial.friction = 0;
+
+        world.addBody(floorBody);
+
+        var groundMaterial = new CANNON.Material("groundMaterial");
+        var wheelMaterial = new CANNON.Material("wheelMaterial");
+        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
+            friction: 0.1,
+            restitution: 1,
+            // contactEquationStiffness: 1000
+        });
+
+        // We must add the contact materials to the world
+        world.addContactMaterial(wheelGroundContactMaterial);
+
+        // var boxShape;
+        // boxShape = new CANNON.Box(new CANNON.Vec3(200, 100, 100));
+        // var boxBody = new CANNON.Body({ mass: 10 });
+        // boxBody.addShape(boxShape);
+        // boxBody.position.set(5000, 1000, 0);
+        // boxBody.angularVelocity.set(0, 0, 0);
+        // world.addBody(boxBody);
+        // demo.addVisual(boxBody);
+
+
+        var chassisShape;
+        // chassisShape = new CANNON.Box(new CANNON.Vec3(2, 1, 0.5));
+        chassisShape = new CANNON.Box(new CANNON.Vec3(20, 10, 5));
+        // chassisShape = new CANNON.Box(new CANNON.Vec3(50, 50, 50));
+        var chassisBody = new CANNON.Body({ mass: mass });
+        chassisBody.addShape(chassisShape);
+        chassisBody.position.set(0, 0, 4);
+        chassisBody.angularVelocity.set(0, 0, 0.5);
+        chassisBody.quaternion.set(Math.PI/2, 0, 0, 1);
+        demo.addVisual(chassisBody);
+        // console.log('Chassis Body', chassisBody.type);
+
+        var options = {
+
+            // radius: 0.5,
+            radius: 5,
+            // directionLocal: new CANNON.Vec3(0, 0, -1),
+            directionLocal: new CANNON.Vec3(0, -1, 0),
+            suspensionStiffness: 30,
+            suspensionRestLength: 0.3,
+            frictionSlip: 5,
+            dampingRelaxation: 2.3,
+            dampingCompression: 4.4,
+            maxSuspensionForce: 100000,
+            rollInfluence:  0.01,
+            axleLocal: new CANNON.Vec3(0, 1, 0),
+            chassisConnectionPointLocal: new CANNON.Vec3(1, 1, 0),
+            maxSuspensionTravel: 0.3,
+            customSlidingRotationalSpeed: -30,
+            useCustomSlidingRotationalSpeed: true
+        };
+
+        // Create the vehicle
+        vehicle = new CANNON.RaycastVehicle({
+            chassisBody: chassisBody,
+        });
+
+        console.log(vehicle);
+
+        // options.chassisConnectionPointLocal.set(100, 100, 0);
+        options.chassisConnectionPointLocal.set(10, 10, 0);
+        vehicle.addWheel(options);
+
+        // options.chassisConnectionPointLocal.set(100, -100, 0);
+        options.chassisConnectionPointLocal.set(10, -10, 0);
+        vehicle.addWheel(options);
+
+        // options.chassisConnectionPointLocal.set(-100, 100, 0);
+        options.chassisConnectionPointLocal.set(-10, 10, 0);
+        vehicle.addWheel(options);
+
+        // options.chassisConnectionPointLocal.set(-100, -100, 0);
+        options.chassisConnectionPointLocal.set(-10, -10, 0);
+        vehicle.addWheel(options);
+
+        vehicle.addToWorld(world);
+
+        var wheelBodies = [];
+        for(var i = 0; i < vehicle.wheelInfos.length; i++) {
+
+            var wheel = vehicle.wheelInfos[i];
+            var cylinderShape = new CANNON.Cylinder(wheel.radius, wheel.radius, wheel.radius / 2, 20);
+            var wheelBody = new CANNON.Body({
+                mass: 0
+            });
+            wheelBody.type = CANNON.Body.KINEMATIC;
+            wheelBody.collisionFilterGroup = 0; // turn off collisions
+            var q = new CANNON.Quaternion();
+            q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+            wheelBody.addShape(cylinderShape, new CANNON.Vec3(), q);
+            wheelBodies.push(wheelBody);
+            demo.addVisual(wheelBody);
+            // console.log('Wheel Body', cylinderShape.type);
+            world.addBody(wheelBody);
+        }
+
+        // Update wheels
+        world.addEventListener('postStep', function() {
+            for (var i = 0; i < vehicle.wheelInfos.length; i++) {
+                vehicle.updateWheelTransform(i);
+                var t = vehicle.wheelInfos[i].worldTransform;
+                var wheelBody = wheelBodies[i];
+                wheelBody.position.copy(t.position);
+                wheelBody.quaternion.copy(t.quaternion);
+            }
+        });
+
+        // var matrix = [];
+        // var sizeX = 64,
+        //     sizeY = 64;
+
+        // for (var i = 0; i < sizeX; i++) {
+        //     matrix.push([]);
+        //     for (var j = 0; j < sizeY; j++) {
+        //         var height = 0;
+        //         matrix[i].push(height);
+        //     }
+        // }
+
+        // var hfShape = new CANNON.Heightfield(matrix, {
+        //     elementSize: 100 / sizeX
+        // });
+        // // var hfShape = new CANNON.PLANE();
+        // var hfBody = new CANNON.Body({ mass: 0 });
+        // hfBody.addShape(hfShape);
+        // hfBody.position.set(-sizeX * hfShape.elementSize / 2, -sizeY * hfShape.elementSize / 2, -1);
+        // world.addBody(hfBody);
+        // demo.addVisual(hfBody);
+        // console.log('hfBody', hfBody.type);
+    });
+
+    // demo.start();
+
+    gui.add(scene.fog, 'near').min(100).max(10000).step(1).name("Fog Near");
+    gui.add(scene.fog, 'far').min(10000).max(90000).step(1).name("Fog Far");
+
+    // gui.add(camera, 'near').min(1).max(1000).step(1).name("Camera Near");
+    // gui.add(camera, 'far').min(100).max(20000).step(1).name("Camera Far");
+
+    gui.add(controls, 'maxDistance').min(1000).max(30000).step(1).name("Controls MaxDistance");
+
+
+    gui.add(camera.position, 'x').min(1).max(10000).step(1).name("Camera x");
+    gui.add(camera.position, 'y').min(1).max(10000).step(1).name("Camera y");
+    gui.add(camera.position, 'z').min(1).max(10000).step(1).name("Camera z");    
+
+    // gui.add(params, 'z').min(1).max(50).step(1);
+    // gui.add(params, 'w').min(1).max(50).step(1);
+    // gui.add(params, 't').min(1).max(50).step(1);
+    // gui.add(params, 'f').min(1).max(50).step(1);
+
+
+
+    document.onkeydown = handler;
+    document.onkeyup = handler;
+
+    var maxSteerVal = 100; //0.5;
+    var maxForce = 1000000;
+    var brakeForce = 1000000;
+
+
+    function handler(event) {
+
+        console.log(event.keyCode);
+
+        var up = (event.type == 'keyup');
+
+        if(!up && event.type !== 'keydown'){
+            return;
+        }
+
+        vehicle.setBrake(0, 0);
+        vehicle.setBrake(0, 1);
+        vehicle.setBrake(0, 2);
+        vehicle.setBrake(0, 3);
+
+        switch(event.keyCode) {
+
+        case 87: // 38: // forward
+            vehicle.applyEngineForce(up ? 0 : -maxForce, 2);
+            vehicle.applyEngineForce(up ? 0 : -maxForce, 3);
+            break;
+
+        case 83: // 40: // backward
+            vehicle.applyEngineForce(up ? 0 : maxForce, 2);
+            vehicle.applyEngineForce(up ? 0 : maxForce, 3);
+            break;
+
+        case 66: // b
+            vehicle.setBrake(brakeForce, 0);
+            vehicle.setBrake(brakeForce, 1);
+            vehicle.setBrake(brakeForce, 2);
+            vehicle.setBrake(brakeForce, 3);
+            break;
+
+        case 68: // 39: // right
+            vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 0);
+            vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 1);
+            break;
+
+        case 65: // 37: // left
+            vehicle.setSteeringValue(up ? 0 : maxSteerVal, 0);
+            vehicle.setSteeringValue(up ? 0 : maxSteerVal, 1);
+            break;
+
+        }
+
+    };
+
+
+
+    // camera.position.y = 1;
+    const clock = new THREE.Clock()
+    let oldElapsedTime = 0
+    camera.position.z = 5;
+
+    var animate = function () {
+
+        stats.begin();
+
+        renderer.render(scene, camera);
+
+        // if(carMove == "forward" && carTurn == "stop")
+        //     car.position.x += 50;
+        // else if(carMove == "backward" && carTurn == "stop")
+        //     car.position.x -= 50;
+
+        // if(carTurn == "right") {
+        //     car.rotation.y -= 0.01;
+        //     car.position.x += 10;
+        //     car.position.z += 10;
+        // }
+
+        const elapsedTime = clock.getElapsedTime()
+        const deltaTime = elapsedTime - oldElapsedTime
+        oldElapsedTime = elapsedTime
+        
+        // demo.animate();
+
+        for(const object of objectsToUpdate)
+        {
+            object.mesh.position.copy(object.body.position)
+            object.mesh.quaternion.copy(object.body.quaternion)
+        }
+
+
+        stats.end();
+
+        requestAnimationFrame(animate);
+
+    };
+
+    animate();
+
+// });
+
+
+</script>

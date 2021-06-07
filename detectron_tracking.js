@@ -1,6 +1,5 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
-// const  fs = require('fs')
 const net = require('net')
 
 let mainWindow
@@ -96,16 +95,6 @@ ipcMain.on('tracking:connection:close', (event) => {
     deactivate();
 })
 
-// function connect() {
-
-//     clientVision.connect(6070, '127.0.0.1', function() {
-//         console.log('Connected to Vision');
-//     })
-
-//     clientTracking.connect(6060, '127.0.0.1', function() {
-//         console.log('Connected to Tracking');
-//     })
-// }
 
 
 ipcMain.on('tracking:connect:detectron', (event, ip, port) => {
@@ -127,7 +116,6 @@ ipcMain.on('tracking:connect:jpda', (event, ip, port) => {
 clientVision.on('data', function(data) {
 
     mainWindow.webContents.send('tracking:vision:data:get', String(data))
-    // mainWindow.webContents.send('tracking:vision:data:get', String(data).split(','))
 })
 
 clientTracking.on('data', function(data) {

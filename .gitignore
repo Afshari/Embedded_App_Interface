@@ -12,6 +12,7 @@ siamfc/results/*
 detectron_siamfc/data/*
 detectron_siamfc/output/*
 python_codes/*
+ekf_localization/Archives
 
 #files
 *.tgz

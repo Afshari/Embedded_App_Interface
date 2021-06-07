@@ -65,7 +65,6 @@ function isActive() {
 }
 
 
-
 function connect() {
 
     client.connect(SERVER_PORT, SERVER_IP, function() {
@@ -98,15 +97,19 @@ ipcMain.on('kf_tracking:tcp:send:measurements', (event, code, measurement) => {
 
 ipcMain.on('kf_tracking:uart:send:measurements', (event, code, uart, measurement) => {
 
-	console.log(measurement);
+	// console.log(measurement);
 
-	if ( typeof port === 'undefined' ) {
+	if ( typeof port === 'undefined' || port.path != uart ) {
 
 		console.log("UART Initialization ...")
 		port = new SerialPort(uart, { baudRate: 115200 });
 
+        console.log(uart);
+        console.log(port.path);
+
 		port.on('error', function(err) {
 			console.log('Error: ', err.message);
+            mainWindow.webContents.send('message:show', "Problem Communicating with Serial Port", "ERROR");
 		});
 
 		port.on('data', function(data) {
@@ -146,7 +149,6 @@ client.on('data', function(data) {
     var y = parseInt( data[1] )
     
     mainWindow.webContents.send('kf_tracking:result', x, y);
-
 })
 
 

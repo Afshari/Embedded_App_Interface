@@ -49,6 +49,17 @@
   const electron = require('electron');
   const { ipcRenderer } = electron;
 
+  ipcRenderer.on('message:show', function (event, message, message_type) {
+
+    showFlashMessage(message, message_type);
+  // if(status == 'connected') {
+  //     $('#span_detectron_status').text('connected')
+  //     $('#span_detectron_status').removeClass("bg-warning").addClass("bg-info")
+  // }
+
+  })
+
+
 
   function showFlashMessage(message, message_type) {
 
@@ -67,7 +78,6 @@
         class_name: 'gritter-light',
         image: img_url
     });
-
 
   }
 
