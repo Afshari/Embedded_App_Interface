@@ -92,20 +92,18 @@
 
 <%- include('./import_below_content.ejs') %>
 
-<!-- <script src="../ekf_localization/smoothie.js"></script> -->
 <script type="text/javascript">
 
-const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
 var Enum = require('enum');
 const THREE = require('three');
 
 require('../ekf_localization/GLTFLoader');
 require('../ekf_localization/OrbitControls');
 require('../ekf_localization/RoomEnvironment');
-let CANNON = require('../ekf_localization/cannon');
-require('../ekf_localization/cannon.demo');
-// require('../ekf_localization/smoothie');
+
+const Ammo = require('../ekf_localization/ammo');
 require('../ekf_localization/Detector');
+require('../ekf_localization/stats.min');
 
 
 const dat = require('dat.gui');
@@ -125,63 +123,37 @@ document.body.appendChild( stats.dom );
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0xcce0ff );
 // scene.fog = new THREE.Fog( 0xcce0ff, 10, 50 );
-scene.fog = new THREE.Fog( 0xcce0ff, 6000, 80000 );
+scene.fog = new THREE.Fog( 0xcce0ff, 10, 2500 );
 
 const loader = new THREE.GLTFLoader();
 
 const canvas = document.querySelector("canvas.webgl");
 
-// const world = new CANNON.World();
-// var demo = new CANNON.Demo(world, scene);
-// var mass = 150;
-
-// world.gravity.set(0, - 9.82 * 1000, 0);
-
-// demo.start();
-
 
 const objectsToUpdate = []
 
-// Default material
-const defaultMaterial = new CANNON.Material('default')
-const defaultContactMaterial = new CANNON.ContactMaterial(
-    defaultMaterial,
-    defaultMaterial,
-    {
-        friction: 0.1,
-        restitution: 0
-    }
-)
-// world.defaultContactMaterial = defaultContactMaterial
-
-// Floor
-const floorShape = new CANNON.Plane()
-const floorBody = new CANNON.Body()
-floorBody.mass = 0
-floorBody.addShape(floorShape)
-floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5) 
-// world.addBody(floorBody)
 
 const textureLoader = new THREE.TextureLoader();
 // const groundTexture = textureLoader.load( '../ekf_localization/textures/terrain/grasslight-big.jpg' );
 const groundTexture = textureLoader.load( '../ekf_localization/textures/granite_seamless_gravel.jpg' );
 groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-groundTexture.repeat.set( 60, 60 );
-groundTexture.anisotropy = 500;
+// groundTexture.repeat.set( 60, 60 );
+groundTexture.repeat.set( 100, 100 );
+groundTexture.anisotropy = 100;
 groundTexture.encoding = THREE.sRGBEncoding;
 
 const groundMaterial = new THREE.MeshLambertMaterial( { map: groundTexture } );
+// const groundMaterial = new THREE.MeshLambertMaterial( { color: 'black' }  );
 
 /**
  * Floor
 */
-// let floor = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), groundMaterial );
-let floor = new THREE.Mesh( new THREE.PlaneGeometry( 120000, 120000 ), groundMaterial );
+let floor = new THREE.Mesh( new THREE.PlaneGeometry( 4000, 4000 ), groundMaterial );
 // floor.position.y = - 250;
+// floor.material.visible = false;
 floor.rotation.x = - Math.PI / 2;
 floor.receiveShadow = true;
 scene.add( floor );
-
 
 
 // Create box
@@ -190,35 +162,6 @@ const boxMaterial = new THREE.MeshStandardMaterial({
     metalness: 0.3,
     roughness: 0.4
 })
-const createBox = (width, height, depth, position) => {
-    // Three.js mesh
-    const mesh = new THREE.Mesh(boxGeometry, boxMaterial)
-    mesh.scale.set(width, height, depth)
-    mesh.castShadow = true
-    mesh.position.copy(position)
-    scene.add(mesh)
-
-    // Cannon.js body
-    const shape = new CANNON.Box(new CANNON.Vec3(width * 0.5, height * 0.5, depth * 0.5))
-
-    const body = new CANNON.Body({
-        mass: 0,
-        position: new CANNON.Vec3(0, 3, 0),
-        shape: shape,
-        material: defaultMaterial
-    })
-    body.position.copy(position)
-    // body.addEventListener('collide', playHitSound)
-    // world.addBody(body)
-
-    // Save in objects
-    objectsToUpdate.push({ mesh, body })
-}
-
-// createBox(500, 700, 500, { x: 1000, y: 0, z: 1000 })
-// createBox(500, 700, 500, { x: -1000, y: 0, z: 1000 })
-
-
 
 var State = new Enum( { 
 
@@ -238,12 +181,11 @@ var lastState = State.ready;
 const windowWidth = 900;
 const windowHeight = 600;
 
-
+Ammo().then(function(Ammo) {
 
     // var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    let camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 150000 );
-    camera.position.set( 6000, 1000, 250 );
-
+    let camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 0.1, 2500 );
+    camera.position.set( 60, 10, 25 );
 
     var renderer = new THREE.WebGLRenderer({ canvas: canvas });
 
@@ -255,49 +197,18 @@ const windowHeight = 600;
 
     renderer.shadowMap.enabled = true;
 
-
-
-    // var light = new THREE.SpotLight( 0xffffff );
-    // light.position.set( 30, 30, 40 );
-    // light.target.position.set( 0, 0, 0 );
-
-    // light.castShadow = true;
-
-    // light.shadowCameraNear = 10;
-    // light.shadowCameraFar = 100;//camera.far;
-    // light.shadowCameraFov = 30;
-
-    // light.shadowMapBias = 0.0039;
-    // light.shadowMapDarkness = 0.5;
-    // light.shadowMapWidth = SHADOW_MAP_WIDTH;
-    // light.shadowMapHeight = SHADOW_MAP_HEIGHT;
-
-
-    // renderer.setClearColor( 0x777777 );
-
-    // var geometry = new THREE.BoxGeometry(1, 1, 1);
-    // var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    // var cube = new THREE.Mesh(geometry, material);
-    // scene.add(cube);
-
-    // const material = new THREE.MeshStandardMaterial({ color: 0xffffff })
-    // material.roughness = 0.4
-    // const plane = new THREE.Mesh(
-    //     new THREE.PlaneBufferGeometry(15, 15),
-    //     material
-    // )
-    // plane.rotation.x = - Math.PI * 0.5
-    // scene.add(plane);
-
-
     let car = null;
     loader.load( '../ekf_localization/gmc_sierra_work_truck/scene.gltf', function ( gltf ) {
 
-        gltf.scene.rotation.y = Math.PI/2;
-        // gltf.scene.position.y = 100;
-        gltf.scene.scale.set(14, 14, 14);
-        // scene.add( gltf.scene );
         car = gltf.scene;
+        car.rotation.y = Math.PI/2;
+        // car.position.y = 50;
+        // gltf.scene.position.y = 100;
+        // gltf.scene.scale.set(14, 14, 14);
+        gltf.scene.scale.set(0.1, 0.1, 0.1);
+        gltf.scene.scale.set(0.2, 0.2, 0.2);
+        
+        window.car = car;
         scene.add(car);
 
     }, undefined, function ( error ) {
@@ -322,9 +233,9 @@ const windowHeight = 600;
         cube_1 = gltf.scene.children[0].children[0].children[0].children[0];
         cube_2 = gltf.scene.children[0].children[0].children[0].children[1];
 
-        cube_1.scale.set(3, 3, 3);
-        cube_1.position.y = 300;
-        cube_2.scale.set(10, 10, 10);
+        cube_1.scale.set(0.05, 0.05, 0.05);
+        // cube_1.position.y = 300;
+        cube_2.scale.set(0.1, 0.1, 0.1);
         // cube_2.position.x = 1500;
         cube_2.position.y = 300;
 
@@ -333,17 +244,15 @@ const windowHeight = 600;
         var cube_1_3 = cube_1.clone();
         var cube_1_4 = cube_1.clone();
 
-        addCube(cube_1_1, 10000, 6000);        
-        addCube(cube_1_2, 10000, 6550);
-        addCube(cube_1_3, 10000, 7100);
-        addCube(cube_1_4, 10000, 6700, 800);
+        addCube(cube_1_1, 100, 60, 7);        
+        addCube(cube_1_2, 100, 70, 7);
+        addCube(cube_1_3, 100, 80, 7);
+        addCube(cube_1_4, 100, 67, 14);
 
         gui.add(cube_1_1.position, 'x').min(-10000).max(10000).step(1).name('Cube 1 x');
         gui.add(cube_1_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
 
-        addCube(cube_2.clone(), 9000, -9000, 1000);
-        // addCube(cube_2.clone(), -5000, 10000);
-        // addCube(cube_2.clone(), -5000, -12000);
+        addCube(cube_2.clone(), 90, -90, 10);
 
     }, undefined, function ( error ) {
         console.error( error );
@@ -354,15 +263,15 @@ const windowHeight = 600;
         // gltf.scene.rotation.y = Math.PI/2;
         
         var bx = gltf.scene;
-        bx.scale.set(1000, 1000, 1000);
+        bx.scale.set(10, 10, 10);
         
         var cube_1 = gltf.scene.clone();
         var cube_2 = gltf.scene.clone();
         var cube_3 = gltf.scene.clone();
 
-        addCube(cube_1, -9000, -6000, 500);
-        addCube(cube_2, -9000, -10000, 500);
-        addCube(cube_3, -9000, -8000, 500);
+        addCube(cube_1, -140, -60,  5);
+        addCube(cube_2, -140, -100, 5);
+        addCube(cube_3, -140, -80,  5);
 
         gui.add(cube_1.position, 'y').min(0).max(10000).step(1).name('Cube 1 y');
         gui.add(cube_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
@@ -376,7 +285,7 @@ const windowHeight = 600;
         gltf.scene.rotation.y = Math.PI/2;
         
         var bx = gltf.scene;
-        bx.scale.set(2000, 2000, 2000);
+        bx.scale.set(20, 20, 20);
         
         var cube_1 = gltf.scene.clone();
         var cube_2 = gltf.scene.clone();
@@ -384,13 +293,11 @@ const windowHeight = 600;
         var cube_4 = gltf.scene.clone();
         var cube_5 = gltf.scene.clone();
 
-        addCube(cube_1, -5000, 10000, 0);
-        addCube(cube_2, -3400, 10000, 0);
-        addCube(cube_3, -6600, 10000, 0);
-        addCube(cube_4, -8200, 10000, 0);
-        addCube(cube_5, -1800, 10000, 0);
-
-        
+        addCube(cube_1, -50, 200, 0);
+        addCube(cube_2, -34, 200, 0);
+        addCube(cube_3, -66, 200, 0);
+        addCube(cube_4, -82, 200, 0);
+        addCube(cube_5, -18, 200, 0);        
 
     }, undefined, function ( error ) {
         console.error( error );
@@ -404,44 +311,39 @@ const windowHeight = 600;
 
         wall = gltf.scene;
 
-        for(var i = 0; i < 16; i++) {
+        for(var i = 0; i < 13; i++) {
 
             let wall_back = wall.clone();
-            wall_back.scale.set(10, 10, 10);
-            wall_back.position.set(16000, 0, (i*2000)-16000);
-            scene.add(wall_back)
+            wall_back.scale.set(0.2, 0.2, 0.2);
+            wall_back.position.set(260, 0, (i*40)-240);
+            scene.add(wall_back);
 
             let wall_front = wall.clone();
-            wall_front.scale.set(10, 10, 10);
-            wall_front.position.set(-16000, 0, (i*2000)-16000);
-            scene.add(wall_front)
+            wall_front.scale.set(0.2, 0.2, 0.2);
+            wall_front.position.set(-260, 0, (i*40)-240);
+            scene.add(wall_front);
 
             let wall_left = wall.clone();
             wall_left.rotation.y = Math.PI;
-            wall_left.scale.set(10, 10, 10);
-            wall_left.position.set((i*2000)-15000, 0, 15000);
-            scene.add(wall_left)
+            wall_left.scale.set(0.2, 0.2, 0.2);
+            // wall_left.position.set(-250, 0, (i*40)-240);
+            wall_left.position.set(-(i*40)+240, 0, -260);
+            scene.add(wall_left);
 
 
             let wall_right = wall.clone();
             wall_right.rotation.y = Math.PI;
-            wall_right.scale.set(10, 10, 10);
-            wall_right.position.set((i*2000)-15000, 0, -17000);
-            scene.add(wall_right)
+            wall_right.scale.set(0.2, 0.2, 0.2);
+            wall_right.position.set((i*40)-240, 0, 260);
+            scene.add(wall_right);
 
         }
-
-        // gui.add(wall_1.position, 'x').min(0).max(10000).step(1).name('Wall 1 x');
-        // gui.add(wall_1.position, 'y').min(0).max(10000).step(1).name('Wall 1 y');
-        // gui.add(wall_1.position, 'z').min(0).max(10000).step(1).name('Wall 1 z');
 
     }, undefined, function ( error ) {
         console.error( error );
     } );    
 
-
     const sphereSize = 1;
-
 
     var ambient = new THREE.AmbientLight( 0x666666 );
     scene.add( ambient );
@@ -466,180 +368,16 @@ const windowHeight = 600;
 
     scene.add( light );
 
-
     const controls = new THREE.OrbitControls(camera, canvas)
-    // controls.target.y = 2
-    // controls.enableDamping = true
     controls.maxPolarAngle = Math.PI * 0.45;
     controls.minPolarAngle = Math.PI * 0.2;
-    // controls.minDistance = 1000;
-    controls.minDistance = 10;
-    controls.maxDistance = 25000;
+    controls.minDistance = 1;
+    controls.maxDistance = 700;
 
 
-    var demo = new CANNON.Demo(scene, light, camera, controls, renderer, ambient);
+    gui.add(scene.fog, 'near').min(10).max(1000).step(1).name("Fog Near");
+    gui.add(scene.fog, 'far').min(1000).max(10000).step(1).name("Fog Far");
 
-    console.log('Sphere', CANNON.Shape.types.SPHERE)
-    console.log('Particle', CANNON.Shape.types.PARTICLE)
-    console.log('Plane', CANNON.Shape.types.PLANE)
-    console.log('Box', CANNON.Shape.types.BOX)
-    console.log('CONVEXPOLYHEDRON', CANNON.Shape.types.CONVEXPOLYHEDRON)
-    console.log('HEIGHTFIELD', CANNON.Shape.types.HEIGHTFIELD)
-    console.log('Trimesh', CANNON.Shape.types.TRIMESH)
-    console.log('--------------')
-
-
-    var mass = 150;
-    var vehicle;
-    demo.addScene(function() {
-
-        var world = demo.getWorld();
-        world.broadphase = new CANNON.SAPBroadphase(world);
-        // world.gravity.set(0, 0, -10);
-        world.gravity.set(0, -100, 0);
-        world.defaultContactMaterial.friction = 0;
-
-        world.addBody(floorBody);
-
-        var groundMaterial = new CANNON.Material("groundMaterial");
-        var wheelMaterial = new CANNON.Material("wheelMaterial");
-        var wheelGroundContactMaterial = window.wheelGroundContactMaterial = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
-            friction: 0.1,
-            restitution: 1,
-            // contactEquationStiffness: 1000
-        });
-
-        // We must add the contact materials to the world
-        world.addContactMaterial(wheelGroundContactMaterial);
-
-        // var boxShape;
-        // boxShape = new CANNON.Box(new CANNON.Vec3(200, 100, 100));
-        // var boxBody = new CANNON.Body({ mass: 10 });
-        // boxBody.addShape(boxShape);
-        // boxBody.position.set(5000, 1000, 0);
-        // boxBody.angularVelocity.set(0, 0, 0);
-        // world.addBody(boxBody);
-        // demo.addVisual(boxBody);
-
-
-        var chassisShape;
-        // chassisShape = new CANNON.Box(new CANNON.Vec3(2, 1, 0.5));
-        chassisShape = new CANNON.Box(new CANNON.Vec3(20, 10, 5));
-        // chassisShape = new CANNON.Box(new CANNON.Vec3(50, 50, 50));
-        var chassisBody = new CANNON.Body({ mass: mass });
-        chassisBody.addShape(chassisShape);
-        chassisBody.position.set(0, 0, 4);
-        chassisBody.angularVelocity.set(0, 0, 0.5);
-        chassisBody.quaternion.set(Math.PI/2, 0, 0, 1);
-        demo.addVisual(chassisBody);
-        // console.log('Chassis Body', chassisBody.type);
-
-        var options = {
-
-            // radius: 0.5,
-            radius: 5,
-            // directionLocal: new CANNON.Vec3(0, 0, -1),
-            directionLocal: new CANNON.Vec3(0, -1, 0),
-            suspensionStiffness: 30,
-            suspensionRestLength: 0.3,
-            frictionSlip: 5,
-            dampingRelaxation: 2.3,
-            dampingCompression: 4.4,
-            maxSuspensionForce: 100000,
-            rollInfluence:  0.01,
-            axleLocal: new CANNON.Vec3(0, 1, 0),
-            chassisConnectionPointLocal: new CANNON.Vec3(1, 1, 0),
-            maxSuspensionTravel: 0.3,
-            customSlidingRotationalSpeed: -30,
-            useCustomSlidingRotationalSpeed: true
-        };
-
-        // Create the vehicle
-        vehicle = new CANNON.RaycastVehicle({
-            chassisBody: chassisBody,
-        });
-
-        console.log(vehicle);
-
-        // options.chassisConnectionPointLocal.set(100, 100, 0);
-        options.chassisConnectionPointLocal.set(10, 10, 0);
-        vehicle.addWheel(options);
-
-        // options.chassisConnectionPointLocal.set(100, -100, 0);
-        options.chassisConnectionPointLocal.set(10, -10, 0);
-        vehicle.addWheel(options);
-
-        // options.chassisConnectionPointLocal.set(-100, 100, 0);
-        options.chassisConnectionPointLocal.set(-10, 10, 0);
-        vehicle.addWheel(options);
-
-        // options.chassisConnectionPointLocal.set(-100, -100, 0);
-        options.chassisConnectionPointLocal.set(-10, -10, 0);
-        vehicle.addWheel(options);
-
-        vehicle.addToWorld(world);
-
-        var wheelBodies = [];
-        for(var i = 0; i < vehicle.wheelInfos.length; i++) {
-
-            var wheel = vehicle.wheelInfos[i];
-            var cylinderShape = new CANNON.Cylinder(wheel.radius, wheel.radius, wheel.radius / 2, 20);
-            var wheelBody = new CANNON.Body({
-                mass: 0
-            });
-            wheelBody.type = CANNON.Body.KINEMATIC;
-            wheelBody.collisionFilterGroup = 0; // turn off collisions
-            var q = new CANNON.Quaternion();
-            q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
-            wheelBody.addShape(cylinderShape, new CANNON.Vec3(), q);
-            wheelBodies.push(wheelBody);
-            demo.addVisual(wheelBody);
-            // console.log('Wheel Body', cylinderShape.type);
-            world.addBody(wheelBody);
-        }
-
-        // Update wheels
-        world.addEventListener('postStep', function() {
-            for (var i = 0; i < vehicle.wheelInfos.length; i++) {
-                vehicle.updateWheelTransform(i);
-                var t = vehicle.wheelInfos[i].worldTransform;
-                var wheelBody = wheelBodies[i];
-                wheelBody.position.copy(t.position);
-                wheelBody.quaternion.copy(t.quaternion);
-            }
-        });
-
-        // var matrix = [];
-        // var sizeX = 64,
-        //     sizeY = 64;
-
-        // for (var i = 0; i < sizeX; i++) {
-        //     matrix.push([]);
-        //     for (var j = 0; j < sizeY; j++) {
-        //         var height = 0;
-        //         matrix[i].push(height);
-        //     }
-        // }
-
-        // var hfShape = new CANNON.Heightfield(matrix, {
-        //     elementSize: 100 / sizeX
-        // });
-        // // var hfShape = new CANNON.PLANE();
-        // var hfBody = new CANNON.Body({ mass: 0 });
-        // hfBody.addShape(hfShape);
-        // hfBody.position.set(-sizeX * hfShape.elementSize / 2, -sizeY * hfShape.elementSize / 2, -1);
-        // world.addBody(hfBody);
-        // demo.addVisual(hfBody);
-        // console.log('hfBody', hfBody.type);
-    });
-
-    // demo.start();
-
-    gui.add(scene.fog, 'near').min(100).max(10000).step(1).name("Fog Near");
-    gui.add(scene.fog, 'far').min(10000).max(90000).step(1).name("Fog Far");
-
-    // gui.add(camera, 'near').min(1).max(1000).step(1).name("Camera Near");
-    // gui.add(camera, 'far').min(100).max(20000).step(1).name("Camera Far");
 
     gui.add(controls, 'maxDistance').min(1000).max(30000).step(1).name("Controls MaxDistance");
 
@@ -648,115 +386,412 @@ const windowHeight = 600;
     gui.add(camera.position, 'y').min(1).max(10000).step(1).name("Camera y");
     gui.add(camera.position, 'z').min(1).max(10000).step(1).name("Camera z");    
 
-    // gui.add(params, 'z').min(1).max(50).step(1);
-    // gui.add(params, 'w').min(1).max(50).step(1);
-    // gui.add(params, 't').min(1).max(50).step(1);
-    // gui.add(params, 'f').min(1).max(50).step(1);
-
-
-
-    document.onkeydown = handler;
-    document.onkeyup = handler;
-
-    var maxSteerVal = 100; //0.5;
-    var maxForce = 1000000;
-    var brakeForce = 1000000;
-
-
-    function handler(event) {
-
-        console.log(event.keyCode);
-
-        var up = (event.type == 'keyup');
-
-        if(!up && event.type !== 'keydown'){
-            return;
-        }
-
-        vehicle.setBrake(0, 0);
-        vehicle.setBrake(0, 1);
-        vehicle.setBrake(0, 2);
-        vehicle.setBrake(0, 3);
-
-        switch(event.keyCode) {
-
-        case 87: // 38: // forward
-            vehicle.applyEngineForce(up ? 0 : -maxForce, 2);
-            vehicle.applyEngineForce(up ? 0 : -maxForce, 3);
-            break;
-
-        case 83: // 40: // backward
-            vehicle.applyEngineForce(up ? 0 : maxForce, 2);
-            vehicle.applyEngineForce(up ? 0 : maxForce, 3);
-            break;
-
-        case 66: // b
-            vehicle.setBrake(brakeForce, 0);
-            vehicle.setBrake(brakeForce, 1);
-            vehicle.setBrake(brakeForce, 2);
-            vehicle.setBrake(brakeForce, 3);
-            break;
-
-        case 68: // 39: // right
-            vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 0);
-            vehicle.setSteeringValue(up ? 0 : -maxSteerVal, 1);
-            break;
-
-        case 65: // 37: // left
-            vehicle.setSteeringValue(up ? 0 : maxSteerVal, 0);
-            vehicle.setSteeringValue(up ? 0 : maxSteerVal, 1);
-            break;
-
-        }
-
-    };
-
-
 
     // camera.position.y = 1;
     const clock = new THREE.Clock()
     let oldElapsedTime = 0
     camera.position.z = 5;
 
-    var animate = function () {
+    var materialDynamic, materialStatic, materialInteractive;
 
-        stats.begin();
+    // - Global variables -
+    var DISABLE_DEACTIVATION = 4;
+    var TRANSFORM_AUX = new Ammo.btTransform();
+    var ZERO_QUATERNION = new THREE.Quaternion(0, 0, 0, 1);
 
-        renderer.render(scene, camera);
 
-        // if(carMove == "forward" && carTurn == "stop")
-        //     car.position.x += 50;
-        // else if(carMove == "backward" && carTurn == "stop")
-        //     car.position.x -= 50;
+    // Physics variables
+    var collisionConfiguration;
+    var dispatcher;
+    var broadphase;
+    var solver;
+    var physicsWorld;
 
-        // if(carTurn == "right") {
-        //     car.rotation.y -= 0.01;
-        //     car.position.x += 10;
-        //     car.position.z += 10;
-        // }
+    var syncList = [];
+    var time = 0;
+    var objectTimePeriod = 3;
+    var timeNextSpawn = time + objectTimePeriod;
+    var maxNumObjects = 30;
 
-        const elapsedTime = clock.getElapsedTime()
-        const deltaTime = elapsedTime - oldElapsedTime
-        oldElapsedTime = elapsedTime
-        
-        // demo.animate();
+    // Keybord actions
+    var actions = {};
+    var keysActions = {
+        "KeyW":'acceleration',
+        "KeyS":'braking',
+        "KeyA":'left',
+        "KeyD":'right'
+    };
 
-        for(const object of objectsToUpdate)
-        {
-            object.mesh.position.copy(object.body.position)
-            object.mesh.quaternion.copy(object.body.quaternion)
+
+
+    function initGraphics() {
+
+        // speedometer = document.getElementById( 'speedometer' );
+
+        materialDynamic = new THREE.MeshPhongMaterial( { color:0xfca400 } );
+        materialStatic = new THREE.MeshPhongMaterial( { color:0x999999 } );
+        materialInteractive =new THREE.MeshPhongMaterial( { color:0x990000 } );
+
+        materialDynamic.wireframe = true;
+        materialStatic.wireframe = true;
+        materialInteractive.wireframe = true;
+
+        materialDynamic.visible = false;
+        materialStatic.visible = false;
+        materialInteractive.visible = false;
+
+        // container.innerHTML = "";
+        // container.appendChild( renderer.domElement );
+
+        // stats = new Stats();
+        // stats.domElement.style.position = 'absolute';
+        // stats.domElement.style.top = '0px';
+        // container.appendChild( stats.domElement );
+
+        // window.addEventListener( 'resize', onWindowResize, false );
+        window.addEventListener( 'keydown', keydown);
+        window.addEventListener( 'keyup', keyup);
+    }
+
+    function keyup(e) {
+        if(keysActions[e.code]) {
+            actions[keysActions[e.code]] = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }
+    function keydown(e) {
+        if(keysActions[e.code]) {
+            actions[keysActions[e.code]] = true;
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }
+
+
+
+    function initPhysics() {
+
+        // Physics configuration
+        collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+        dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );
+        broadphase = new Ammo.btDbvtBroadphase();
+        solver = new Ammo.btSequentialImpulseConstraintSolver();
+        physicsWorld = new Ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
+        physicsWorld.setGravity( new Ammo.btVector3( 0, -9.82, 0 ) );
+    }
+
+    function createBox(pos, quat, w, l, h, mass, friction) {
+
+        var material = mass > 0 ? materialDynamic : materialStatic;
+        var shape = new THREE.BoxGeometry(w, l, h, 1, 1, 1);
+        var geometry = new Ammo.btBoxShape(new Ammo.btVector3(w * 0.5, l * 0.5, h * 0.5));
+
+        if(!mass) mass = 0;
+        if(!friction) friction = 1;
+
+        var mesh = new THREE.Mesh(shape, material);
+        mesh.position.copy(pos);
+        mesh.quaternion.copy(quat);
+        scene.add( mesh );
+
+        var transform = new Ammo.btTransform();
+        transform.setIdentity();
+        transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+        transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+        var motionState = new Ammo.btDefaultMotionState(transform);
+
+        var localInertia = new Ammo.btVector3(0, 0, 0);
+        geometry.calculateLocalInertia(mass, localInertia);
+
+        var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, geometry, localInertia);
+        var body = new Ammo.btRigidBody(rbInfo);
+
+        body.setFriction(friction);
+        //body.setRestitution(.9);
+        //body.setDamping(0.2, 0.2);
+
+        physicsWorld.addRigidBody( body );
+
+        if (mass > 0) {
+            body.setActivationState(DISABLE_DEACTIVATION);
+            // Sync physics and graphics
+            function sync(dt) {
+                var ms = body.getMotionState();
+                if (ms) {
+                    ms.getWorldTransform(TRANSFORM_AUX);
+                    var p = TRANSFORM_AUX.getOrigin();
+                    var q = TRANSFORM_AUX.getRotation();
+                    mesh.position.set(p.x(), p.y(), p.z());
+                    mesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
+                }
+            }
+
+            syncList.push(sync);
+        }
+    }
+
+    function createWheelMesh(radius, width) {
+        var t = new THREE.CylinderGeometry(radius, radius, width, 24, 1);
+        t.rotateZ(Math.PI / 2);
+        var mesh = new THREE.Mesh(t, materialInteractive);
+        mesh.add(new THREE.Mesh(new THREE.BoxGeometry(width * 1.5, radius * 1.75, radius*.25, 1, 1, 1), materialInteractive));
+        scene.add(mesh);
+        return mesh;
+    }
+
+    function createChassisMesh(w, l, h) {
+        var shape = new THREE.BoxGeometry(w, l, h, 1, 1, 1);
+        var mesh = new THREE.Mesh(shape, materialInteractive);
+        scene.add(mesh);
+        return mesh;
+    }
+
+    function createVehicle(pos, quat) {
+
+
+        var chassisWidth = 16;
+        var chassisHeight = 2.5;
+        var chassisLength = 40;
+        var massVehicle = 800;
+
+        var wheelAxisPositionBack = -12;
+        var wheelHalfTrackBack = 8;
+        var wheelAxisHeightBack = -1;
+        var wheelRadiusBack = 2;
+        var wheelWidthBack = 1;
+
+        var wheelAxisFrontPosition = 12;
+        var wheelHalfTrackFront = 8;
+        var wheelAxisHeightFront = -1;
+        var wheelRadiusFront = 2;
+        var wheelWidthFront = 1;
+
+        var friction = 100;
+        var suspensionStiffness = 20.0;
+        var suspensionDamping = 2.3;
+        var suspensionCompression = 4.4;
+        var suspensionRestLength = 0.6;
+        // var rollInfluence = 0.2;
+        var rollInfluence = 0.1;
+
+        var steeringIncrement = .04;
+        var steeringClamp = .5;
+        var maxEngineForce = 700;
+        var maxBreakingForce = 100;
+
+
+        // Chassis
+        var geometry = new Ammo.btBoxShape(new Ammo.btVector3(chassisWidth * .5, chassisHeight * .5, chassisLength * .5));
+        var transform = new Ammo.btTransform();
+        transform.setIdentity();
+        transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+        transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+        var motionState = new Ammo.btDefaultMotionState(transform);
+        var localInertia = new Ammo.btVector3(0, 0, 0);
+        geometry.calculateLocalInertia(massVehicle, localInertia);
+        var body = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(massVehicle, motionState, geometry, localInertia));
+        body.setActivationState(DISABLE_DEACTIVATION);
+        physicsWorld.addRigidBody(body);
+        var chassisMesh = createChassisMesh(chassisWidth, chassisHeight, chassisLength);
+
+        // Raycast Vehicle
+        var engineForce = 0;
+        var vehicleSteering = 0;
+        var breakingForce = 0;
+        var tuning = new Ammo.btVehicleTuning();
+        var rayCaster = new Ammo.btDefaultVehicleRaycaster(physicsWorld);
+        var vehicle = new Ammo.btRaycastVehicle(tuning, body, rayCaster);
+        window.vehicle = vehicle;
+        vehicle.setCoordinateSystem(0, 1, 2);
+        physicsWorld.addAction(vehicle);
+
+        // Wheels
+        var FRONT_LEFT = 0;
+        var FRONT_RIGHT = 1;
+        var BACK_LEFT = 2;
+        var BACK_RIGHT = 3;
+        var wheelMeshes = [];
+        var wheelDirectionCS0 = new Ammo.btVector3(0, -1, 0);
+        var wheelAxleCS = new Ammo.btVector3(-1, 0, 0);
+
+        function addWheel(isFront, pos, radius, width, index) {
+
+            var wheelInfo = vehicle.addWheel(
+                    pos,
+                    wheelDirectionCS0,
+                    wheelAxleCS,
+                    suspensionRestLength,
+                    radius,
+                    tuning,
+                    isFront);
+
+            wheelInfo.set_m_suspensionStiffness(suspensionStiffness);
+            wheelInfo.set_m_wheelsDampingRelaxation(suspensionDamping);
+            wheelInfo.set_m_wheelsDampingCompression(suspensionCompression);
+            wheelInfo.set_m_frictionSlip(friction);
+            wheelInfo.set_m_rollInfluence(rollInfluence);
+
+            wheelMeshes[index] = createWheelMesh(radius, width);
         }
 
+        addWheel(true, new Ammo.btVector3(wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_LEFT);
+        addWheel(true, new Ammo.btVector3(-wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_RIGHT);
+        addWheel(false, new Ammo.btVector3(-wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_LEFT);
+        addWheel(false, new Ammo.btVector3(wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_RIGHT);
 
-        stats.end();
+        // Sync keybord actions and physics and graphics
+        function sync(dt) {
+
+            var speed = vehicle.getCurrentSpeedKmHour();
+
+            // speedometer.innerHTML = (speed < 0 ? '(R) ' : '') + Math.abs(speed).toFixed(1) + ' km/h';
+
+            breakingForce = 0;
+            engineForce = 0;
+
+            if (actions.acceleration) {
+                if (speed < -1)
+                    breakingForce = maxBreakingForce;
+                else engineForce = maxEngineForce;
+            }
+            if (actions.braking) {
+                if (speed > 1)
+                    breakingForce = maxBreakingForce;
+                else engineForce = -maxEngineForce / 2;
+            }
+            if (actions.left) {
+                if (vehicleSteering < steeringClamp)
+                    vehicleSteering += steeringIncrement;
+            }
+            else {
+                if (actions.right) {
+                    if (vehicleSteering > -steeringClamp)
+                        vehicleSteering -= steeringIncrement;
+                }
+                else {
+                    if (vehicleSteering < -steeringIncrement)
+                        vehicleSteering += steeringIncrement;
+                    else {
+                        if (vehicleSteering > steeringIncrement)
+                            vehicleSteering -= steeringIncrement;
+                        else {
+                            vehicleSteering = 0;
+                        }
+                    }
+                }
+            }
+
+
+            if(speed > 900) 
+                engineForce = 0;
+
+            vehicle.applyEngineForce(engineForce, BACK_LEFT);
+            vehicle.applyEngineForce(engineForce, BACK_RIGHT);
+
+            vehicle.setBrake(breakingForce / 2, FRONT_LEFT);
+            vehicle.setBrake(breakingForce / 2, FRONT_RIGHT);
+            vehicle.setBrake(breakingForce, BACK_LEFT);
+            vehicle.setBrake(breakingForce, BACK_RIGHT);
+
+            vehicle.setSteeringValue(vehicleSteering, FRONT_LEFT);
+            vehicle.setSteeringValue(vehicleSteering, FRONT_RIGHT);
+
+
+            var tm, p, q, i;
+            var n = vehicle.getNumWheels();
+            for (i = 0; i < n; i++) {
+                vehicle.updateWheelTransform(i, true);
+                tm = vehicle.getWheelTransformWS(i);
+                p = tm.getOrigin();
+                q = tm.getRotation();
+                wheelMeshes[i].position.set(p.x(), p.y(), p.z());
+                wheelMeshes[i].quaternion.set(q.x(), q.y(), q.z(), q.w());
+            }
+
+            tm = vehicle.getChassisWorldTransform();
+            p = tm.getOrigin();
+            q = tm.getRotation();
+            chassisMesh.position.set(p.x(), p.y(), p.z());
+            chassisMesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
+        }
+
+        syncList.push(sync);
+    }
+
+    initGraphics();
+    initPhysics();
+    // createBox(new THREE.Vector3(0, -0.5, 0), ZERO_QUATERNION, 50000, 1, 50000, 0, 2);
+    createBox(new THREE.Vector3(0, -0.5, 0), ZERO_QUATERNION, 550, 5, 550, 0, 2);
+    
+    var quaternion = new THREE.Quaternion(0, 0, 0, 1);
+    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    
+    createVehicle(new THREE.Vector3(0, 5, 0), quaternion);
+    // createBox(new THREE.Vector3(0, 200, 0), quaternion, 800, 400, 1000, 0);
+
+
+    createBox(new THREE.Vector3(100, 7, 70), ZERO_QUATERNION, 10, 10, 30, 0, 0);
+    createBox(new THREE.Vector3(-140, 5, -80), ZERO_QUATERNION, 10, 10, 60, 0, 0);
+    createBox(new THREE.Vector3(-50, 3, 200), ZERO_QUATERNION, 80, 5, 5, 0, 0);
+    createBox(new THREE.Vector3(90, 7, -90), ZERO_QUATERNION, 20, 20, 20, 0, 0);
+
+    createBox(new THREE.Vector3(260, 5, 5), ZERO_QUATERNION, 10, 15, 500, 0, 0);
+    createBox(new THREE.Vector3(-260, 5, 5), ZERO_QUATERNION, 10, 15, 500, 0, 0);
+    createBox(new THREE.Vector3(5, 5, -260), ZERO_QUATERNION, 500, 15, 10, 0, 0);
+    createBox(new THREE.Vector3(5, 5, 260), ZERO_QUATERNION, 500, 15, 10, 0, 0);
+
+
+
+    var animate = function () {
 
         requestAnimationFrame(animate);
 
+        stats.begin();
+
+
+        var dt = clock.getDelta();
+        for (var i = 0; i < syncList.length; i++)
+            syncList[i](dt);
+
+        physicsWorld.stepSimulation( dt, 10 );
+        controls.update( dt );
+
+        let vPos = vehicle.getChassisWorldTransform().getOrigin();
+        let vRot = vehicle.getChassisWorldTransform().getRotation();
+        // chassisMesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
+        if(car !== null) {
+            car.position.set(vPos.x(), vPos.y()-5, vPos.z());
+            car.quaternion.set(vRot.x(), vRot.y(), vRot.z(), vRot.w());
+        }
+
+        renderer.render( scene, camera );
+        time += dt;
+
+
+        stats.end();
     };
+
 
     animate();
 
-// });
+    // function tick() {
+    //     requestAnimationFrame( tick );
+    //     var dt = clock.getDelta();
+    //     for (var i = 0; i < syncList.length; i++)
+    //         syncList[i](dt);
+    //     physicsWorld.stepSimulation( dt, 10 );
+    //     controls.update( dt );
+    //     renderer.render( scene, camera );
+    //     time += dt;
+    //     stats.update();
+    // }
+
+
+
+});
 
 
 </script>
