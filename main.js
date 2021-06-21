@@ -98,7 +98,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	} else if(addr === 'ekf_localization.ejs') {
 
-		kf_tracking.init(win);
+		ekf_localization.init(win);
 		win.loadFile('front_end/ekf_localization.ejs');
 
 	}

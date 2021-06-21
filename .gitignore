@@ -11,6 +11,7 @@ siamfc/data/*
 siamfc/results/*
 detectron_siamfc/data/*
 detectron_siamfc/output/*
+python_codes
 python_codes/*
 ekf_localization/Archives
 

@@ -89,10 +89,16 @@
 <canvas class="webgl" id="threejs_canvas"> 
 </canvas>
 
+<br /><br />
+
+<main>
+</main>
 
 <%- include('./import_below_content.ejs') %>
 
 <script type="text/javascript">
+
+const fs = require('fs')
 
 var Enum = require('enum');
 const THREE = require('three');
@@ -175,6 +181,15 @@ var State = new Enum( {
 
 } )
 
+let predictedPath = []
+let groundtruthPath = []
+
+ipcRenderer.on('ekf_localization:draw', (event, x, y) => {
+    // console.log(x, y);
+    predictedPath.push( [x, y] )
+    // circle(x, y, 5);
+});
+
 var state = State.ready;
 var lastState = State.ready;
 
@@ -198,7 +213,9 @@ Ammo().then(function(Ammo) {
     renderer.shadowMap.enabled = true;
 
     let car = null;
-    loader.load( '../ekf_localization/gmc_sierra_work_truck/scene.gltf', function ( gltf ) {
+    let tyres = []
+    loader.load( '../ekf_localization/truck_gmc/truck.gltf', function ( gltf ) {
+    // loader.load( '../ekf_localization/gmc_sierra_work_truck/scene.gltf', function ( gltf ) {
 
         car = gltf.scene;
         car.rotation.y = Math.PI/2;
@@ -209,6 +226,17 @@ Ammo().then(function(Ammo) {
         gltf.scene.scale.set(0.2, 0.2, 0.2);
         
         window.car = car;
+        // console.log(car.children[0].children[0].children[0].children[0].children[0].children[1]);
+        tyre_fr = car.children[0].children[0].children[0].children[0].children[0].children[1];
+        tyre_fl = car.children[0].children[0].children[0].children[0].children[0].children[4];
+        tyre_bl = car.children[0].children[0].children[0].children[0].children[0].children[2];
+        tyre_br = car.children[0].children[0].children[0].children[0].children[0].children[3];
+        // console.log(tyre_1);
+        tyres.push(tyre_fr)
+        tyres.push(tyre_fl)
+        tyres.push(tyre_bl)
+        tyres.push(tyre_br)
+
         scene.add(car);
 
     }, undefined, function ( error ) {
@@ -399,6 +427,8 @@ Ammo().then(function(Ammo) {
     var TRANSFORM_AUX = new Ammo.btTransform();
     var ZERO_QUATERNION = new THREE.Quaternion(0, 0, 0, 1);
 
+
+    window.wheels = null;
 
     // Physics variables
     var collisionConfiguration;
@@ -637,15 +667,20 @@ Ammo().then(function(Ammo) {
             wheelMeshes[index] = createWheelMesh(radius, width);
         }
 
+
         addWheel(true, new Ammo.btVector3(wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_LEFT);
         addWheel(true, new Ammo.btVector3(-wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_RIGHT);
         addWheel(false, new Ammo.btVector3(-wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_LEFT);
         addWheel(false, new Ammo.btVector3(wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_RIGHT);
 
+        window.wheels = wheelMeshes;
+        var lastCoeff = 0;
+
         // Sync keybord actions and physics and graphics
         function sync(dt) {
 
             var speed = vehicle.getCurrentSpeedKmHour();
+            console.log(speed);
 
             // speedometer.innerHTML = (speed < 0 ? '(R) ' : '') + Math.abs(speed).toFixed(1) + ' km/h';
 
@@ -700,6 +735,10 @@ Ammo().then(function(Ammo) {
             vehicle.setSteeringValue(vehicleSteering, FRONT_RIGHT);
 
 
+            let pre_fr_y = wheelMeshes[0].rotation.y;
+            // console.log(wheelMeshes[0], tyres[0])
+            
+
             var tm, p, q, i;
             var n = vehicle.getNumWheels();
             for (i = 0; i < n; i++) {
@@ -709,7 +748,41 @@ Ammo().then(function(Ammo) {
                 q = tm.getRotation();
                 wheelMeshes[i].position.set(p.x(), p.y(), p.z());
                 wheelMeshes[i].quaternion.set(q.x(), q.y(), q.z(), q.w());
+
+                
+
+                if(Math.abs(speed) < 1.2 || tyres.length == 0)
+                    continue;
+
+                var sclRotation = 0.05 * ( (speed / 25) + 1 );
+                if(engineForce > 0) {
+                    // tyres[i].rotation.x += Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
+                    tyres[i].rotation.x += sclRotation;
+                    lastCoeff = 1;
+                } else if(engineForce < 0) {
+                    // tyres[i].rotation.x += (-1) * Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
+                    tyres[i].rotation.x -= sclRotation;
+                    lastCoeff = -1;
+                } else {
+                    // tyres[i].rotation.x += lastCoeff * Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
+                    tyres[i].rotation.x += lastCoeff * sclRotation;
+                }
+
+                
+
+                // if(i < 2) {
+                //     if(vehicleSteering > 0.2)
+                //         tyres[i].rotation.z = Math.PI/4;
+                //     else if(vehicleSteering < -0.2)
+                //     tyres[i].rotation.z = -Math.PI/4;
+                //     else 
+                //         tyres[i].rotation.z = 0.3;
+                // }
+
+
             }
+
+            // tyre_fr.rotation.x += Math.abs(wheelMeshes[0].rotation.y - pre_fr);
 
             tm = vehicle.getChassisWorldTransform();
             p = tm.getOrigin();
@@ -767,6 +840,25 @@ Ammo().then(function(Ammo) {
             car.quaternion.set(vRot.x(), vRot.y(), vRot.z(), vRot.w());
         }
 
+        // tyre_fr.rotation.x += 0.1;
+        if(window.wheels !== null) {
+            // console.log(window.wheels[0].rotation)
+            
+        //     // tyre_fr.rotation.x = window.wheels[0].rotation.y / Math.PI;
+            // tyre_fr.rotation.x = window.wheels[0].rotation.y;
+
+        //     // tyre_fl.rotation.x = window.wheels[1].rotation.y / Math.PI;
+        //     tyre_fl.rotation.z = window.wheels[1].rotation.x;
+
+        //     // tyre_br.rotation.x = window.wheels[2].rotation.y / Math.PI;
+        //     tyre_br.rotation.z = window.wheels[2].rotation.x;
+
+        //     // tyre_bl.rotation.x = window.wheels[3].rotation.y / Math.PI;
+        //     tyre_bl.rotation.z = window.wheels[3].rotation.x;
+        }
+                    
+
+
         renderer.render( scene, camera );
         time += dt;
 
@@ -775,23 +867,161 @@ Ammo().then(function(Ammo) {
     };
 
 
+
+    // console.log(data);
+
+    var tid = setTimeout(carMoveMonitor, 1000);
+    var startX = null;
+    var startY = null;
+    var isPrior = true;
+    function carMoveMonitor() {
+        
+        if(car != null) {
+
+            if(startX === null) {
+                startX = car.position.x;
+                startY = car.position.z;
+            } else {
+                // let content = `${car.position.x}, ${car.position.z}, ${car.rotation.y}\r\n`
+
+                groundtruthPath.push( [ car.position.x, car.position.z ] );
+
+                var currX = car.position.x - startX;
+                var currY = car.position.z - startY;
+
+                var r = Math.sqrt( Math.pow(currX, 2) + Math.pow(currY, 2) )
+                const noiseScale = 5;
+                r = ( r + Math.random() * noiseScale ) - (noiseScale / 2);
+
+                var theta = Math.atan2(currY, currX)
+
+                let u = `${r}, ${theta}`
+                // console.log(content);
+
+                if(isPrior == true) {
+
+                    let std_vel = 0.1;
+                    let std_steer = 1;
+                    let std_range = 0.3;
+                    let std_bearing = 0.1;
+                    let prior_cov_pos = 0.1 
+                    let prior_cov_angle = 0.1
+
+                    ipcRenderer.send('ekf_localization:tcp:send:prior', 
+                        u, std_vel, std_steer, std_range, std_bearing, prior_cov_pos, prior_cov_angle);
+                    isPrior = false;
+
+                } else {
+                    ipcRenderer.send('ekf_localization:tcp:send:measurements', u);
+                }
+
+                // fs.appendFileSync('./ekf_localization/mo_u.txt', content+"\r\n" );
+
+                startX = car.position.x;
+                startY = car.position.z;
+            }
+        }
+        tid = setTimeout(carMoveMonitor, 1000);
+    }
+
     animate();
 
-    // function tick() {
-    //     requestAnimationFrame( tick );
-    //     var dt = clock.getDelta();
-    //     for (var i = 0; i < syncList.length; i++)
-    //         syncList[i](dt);
-    //     physicsWorld.stepSimulation( dt, 10 );
-    //     controls.update( dt );
-    //     renderer.render( scene, camera );
-    //     time += dt;
-    //     stats.update();
-    // }
-
-
-
 });
+
+
+let measurementColor = [ 0, 0, 0, 170 ]
+let groundtruthColor = [ 0, 0, 255, 255 ]
+let estimatedMeanColor = [ 255, 140, 0, 255 ]
+let estimatedCovarColor = [ 255, 0, 0, 90 ]
+let missDetectionColor = [ 255, 0, 0, 255 ]
+let measurementCircleRadius = 5
+
+function drawLegends() {
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Ground Truth', 40, 30)
+    text('Estimated Pose', 40, 50)
+
+    fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    circle(20, 30, measurementCircleRadius)
+    stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    strokeWeight(1.5)
+    line(10, 30, 30, 30)
+
+    noStroke()
+    fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    circle(20, 50, measurementCircleRadius*2)
+
+}
+
+function drawBackground() {
+
+    rectMode(CORNER);
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, 600, 600);
+
+}
+
+function drawObstacles() {
+
+    rectMode(CORNER);
+    fill(128);
+    stroke(128);
+    rect(100, 60, 10, 30);
+    rect(-140, -100, 10, 40);
+    rect(-82, 200, 70, 10);
+    
+    rectMode(CENTER);
+    rect(90, -90, 25, 25);
+}
+
+function setup() {
+    
+    createCanvas(600, 600)
+    
+    drawBackground();
+    drawLegends();
+
+    // pathResult = fs.readFileSync('./ekf_localization/result.txt', { encoding:'utf8', flag:'r' }).split('\n');
+
+    // stroke(0);
+    // strokeWeight(2);
+    
+    frameRate(3);
+}
+
+function draw() {
+    
+    drawBackground();
+    drawLegends();
+    
+    translate(width/2, height/2);
+    rotate(-PI/2);
+
+    drawObstacles();
+
+    fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    for(var i = 0; i < predictedPath.length; i++) {
+
+        circle(groundtruthPath[i][0], groundtruthPath[i][1], 3);
+        if(i > 0)
+            line(groundtruthPath[i][0], groundtruthPath[i][1], groundtruthPath[i - 1][0], groundtruthPath[i - 1][1])
+    }
+
+
+    stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    for(var i = 0; i < predictedPath.length; i++) {
+        circle(predictedPath[i][0], predictedPath[i][1], 3);
+    }
+}
 
 
 </script>
