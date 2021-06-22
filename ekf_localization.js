@@ -13,7 +13,6 @@ let port;
 
 module.exports = {
     init,
-    // readDataFile,
     connect,
     isActive,
     deactivate
@@ -28,7 +27,7 @@ function init(win) {
 
     const timeoutObj = setTimeout(function () {
         
-        connect()
+        // connect()
         
         _isActive = true;
         clearTimeout(timeoutObj)
@@ -48,7 +47,7 @@ function deactivate() {
     if(_isConnected == true) {
 
         _isConnected = false;
-        client.write('29:-');
+        // client.write('29:-');
         client.end();
         client.destroy();
     }
@@ -66,46 +65,46 @@ function connect() {
 }
 
 
-ipcMain.on('ekf_localization:tcp:send:prior', (event, u, std_vel, std_steer, std_range, std_bearing, 
-    prior_cov_pos, prior_cov_angle) => {
+ipcMain.on('ekf_localization:tcp:send:prior', (event, u, std_vel, std_steer, std_range, std_bearing, start_angle,
+    prior_cov_pos, prior_cov_angle, observations, lands) => {
 
-    // data.splice(2, 1)
-    // client.write(`27:10|20:4, 1:${data[0]},0.1,${data[1]},0.1|21:4, 4:0.5,0,0,0,  0,0.1,0,0,  0,0,0.5,0,  0,0,0,0.1`)
-    client.write(`100:${u},${std_vel},${std_steer},${std_range},${std_bearing},1.5,${prior_cov_pos},${prior_cov_angle}`);
+    if(_isConnected == true) {
+        client.write(
+            `100:${u},${std_vel},${std_steer},${std_range},${std_bearing},${start_angle},${prior_cov_pos},${prior_cov_angle}:${observations}:${lands}`);
+    }
 })
 
-ipcMain.on('ekf_localization:tcp:send:measurements', (event, u) => {
+ipcMain.on('ekf_localization:tcp:send:measurements', (event, u, observations) => {
 
-    // strData = "22"
-    // data.forEach(function(item, index, array) {
-    //     strData += `:23:2, 1:${item[0]},${item[1]}|89:`
-    // })
-
-    // console.log(data);
-    client.write(`101:${u}`)
+    if(_isConnected == true) {
+        client.write(`101:${u}:${observations}`)
+    }
 })
 
+ipcMain.on('ekf_localization:tcp:connect', (event) => {
 
-function sendMeasurement(measurement, dt) {
-    client.write(measurement + '|24:' + dt + '|89:')
-}
+    connect();
+});
+
+
+// function sendMeasurement(measurement, dt) {
+//     client.write(measurement + '|24:' + dt + '|89:')
+// }
 
 
 client.on('data', function(data) {
 
     data = data.toString().split(',');
-    // console.log(data);
-    // data = data.toString().replace('\\n', '').split('|')[0]
-    // data = data.replaceAll('[', '').replaceAll(']', '').split('\n')
 
     var x = parseInt( parseFloat( data[0] ) * 10 )
     var y = parseInt( parseFloat( data[1] ) * 10 )
+    var angle = parseFloat( data[2] )
     
-    mainWindow.webContents.send('ekf_localization:draw', x, y );
+    mainWindow.webContents.send('ekf_localization:draw', x, y, angle );
 })
 
 
-
 client.on('close', function() {
+    _isConnected = false;
 	console.log('Connection closed');
 });

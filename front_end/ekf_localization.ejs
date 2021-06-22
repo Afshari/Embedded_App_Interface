@@ -2,7 +2,7 @@
 
 
 <!-- INLINE FORM ELELEMNTS -->
-<div class="row mt">
+<!-- <div class="row mt">
     <div class="col-lg-12">
         <div class="form-panel">
         <h4 class="mb"><i class="fa fa-angle-right"></i> Kalman Parameters</h4>
@@ -68,28 +68,21 @@
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
         </div>
-
-
         </div>
-        <!-- /form-panel -->
     </div>
-    <!-- /col-lg-12 -->
-</div>
+</div> -->
 
 <div style="margin: 5px;">
-    <button type="button" class="btn btn-theme" id="btnResetAll">Reset All</button>
-    <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
     <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
-    <button type="button" class="btn btn-primary" id="btnResetCurrent" >Reset Current Path</button>
-    <button type="button" class="btn btn-primary" id="btnPause" >Pause</button>
-    <button type="button" class="btn btn-primary" id="btnStep" >Step</button>
+    <button type="button" class="btn btn-primary" id="btnStop" >Stop</button>
+    <button type="button" class="btn btn-primary" id="btnReset" >Reset</button>
 
 </div>
 
 <canvas class="webgl" id="threejs_canvas"> 
 </canvas>
 
-<br /><br />
+<br /> <br />
 
 <main>
 </main>
@@ -111,33 +104,51 @@ const Ammo = require('../ekf_localization/ammo');
 require('../ekf_localization/Detector');
 require('../ekf_localization/stats.min');
 
+$(document).ready( () => {
 
-const dat = require('dat.gui');
-const gui = new dat.GUI();
+    $("#btnRun").click( () => {
 
-// dummy variables
-params = { x: 1, y: 1, z: 1, w: 1, t: 1, f: 1 }
-gui.add(params, 'x').min(1).max(50).step(1);
-gui.add(params, 'y').min(1).max(50).step(1);
+        state = State.running;
+        ipcRenderer.send('ekf_localization:tcp:connect');
+    });
+    
+});
 
 
-const Stats = require('stats-js');
-var stats = new Stats();
-stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.body.appendChild( stats.dom );
+const GUI_DEBUG_ENABLE = false;
+const STATS_DEBUG_ENABLE = false;
+
+if(GUI_DEBUG_ENABLE == true) {
+    const dat = require('dat.gui');
+    const gui = new dat.GUI();
+
+    // dummy variables
+    params = { x: 1, y: 1, z: 1, w: 1, t: 1, f: 1 }
+    gui.add(params, 'x').min(1).max(50).step(1);
+    gui.add(params, 'y').min(1).max(50).step(1);
+}
+
+if(STATS_DEBUG_ENABLE == true) {
+    const Stats = require('stats-js');
+    var stats = new Stats();
+    stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+    document.body.appendChild( stats.dom );
+}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color( 0xcce0ff );
 // scene.fog = new THREE.Fog( 0xcce0ff, 10, 50 );
 scene.fog = new THREE.Fog( 0xcce0ff, 10, 2500 );
 
+const axesHelper = new THREE.AxesHelper( 200 );
+
+
 const loader = new THREE.GLTFLoader();
 
 const canvas = document.querySelector("canvas.webgl");
 
 
-const objectsToUpdate = []
-
+// const objectsToUpdate = []
 
 const textureLoader = new THREE.TextureLoader();
 // const groundTexture = textureLoader.load( '../ekf_localization/textures/terrain/grasslight-big.jpg' );
@@ -151,9 +162,7 @@ groundTexture.encoding = THREE.sRGBEncoding;
 const groundMaterial = new THREE.MeshLambertMaterial( { map: groundTexture } );
 // const groundMaterial = new THREE.MeshLambertMaterial( { color: 'black' }  );
 
-/**
- * Floor
-*/
+// Floor 
 let floor = new THREE.Mesh( new THREE.PlaneGeometry( 4000, 4000 ), groundMaterial );
 // floor.position.y = - 250;
 // floor.material.visible = false;
@@ -180,18 +189,26 @@ var State = new Enum( {
     'step': 8
 
 } )
+var state = State.ready;
 
 let predictedPath = []
 let groundtruthPath = []
 
-ipcRenderer.on('ekf_localization:draw', (event, x, y) => {
-    // console.log(x, y);
+ipcRenderer.on('ekf_localization:draw', (event, x, y, angle) => {
+
     predictedPath.push( [x, y] )
-    // circle(x, y, 5);
 });
 
-var state = State.ready;
-var lastState = State.ready;
+
+function resetAllStates() {
+
+    state = State.ready;
+    predictedPath = [];
+    groundtruthPath = [];
+}
+
+// var state = State.ready;
+// var lastState = State.ready;
 
 const windowWidth = 900;
 const windowHeight = 600;
@@ -225,12 +242,21 @@ Ammo().then(function(Ammo) {
         gltf.scene.scale.set(0.1, 0.1, 0.1);
         gltf.scene.scale.set(0.2, 0.2, 0.2);
         
-        window.car = car;
+        // window.car = car;
         // console.log(car.children[0].children[0].children[0].children[0].children[0].children[1]);
         tyre_fr = car.children[0].children[0].children[0].children[0].children[0].children[1];
         tyre_fl = car.children[0].children[0].children[0].children[0].children[0].children[4];
         tyre_bl = car.children[0].children[0].children[0].children[0].children[0].children[2];
         tyre_br = car.children[0].children[0].children[0].children[0].children[0].children[3];
+
+        // tyre_fl.add( axesHelper );
+
+        tyre_fr.rotation.order = 'YZX';
+        tyre_fl.rotation.order = 'YZX';
+        tyre_bl.rotation.order = 'YZX';
+        tyre_br.rotation.order = 'YZX';
+
+        // tyre_fl.rotation.z = Math.PI / 6;
         // console.log(tyre_1);
         tyres.push(tyre_fr)
         tyres.push(tyre_fl)
@@ -277,8 +303,10 @@ Ammo().then(function(Ammo) {
         addCube(cube_1_3, 100, 80, 7);
         addCube(cube_1_4, 100, 67, 14);
 
-        gui.add(cube_1_1.position, 'x').min(-10000).max(10000).step(1).name('Cube 1 x');
-        gui.add(cube_1_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+        if(GUI_DEBUG_ENABLE == true) {
+            gui.add(cube_1_1.position, 'x').min(-10000).max(10000).step(1).name('Cube 1 x');
+            gui.add(cube_1_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+        }
 
         addCube(cube_2.clone(), 90, -90, 10);
 
@@ -301,8 +329,10 @@ Ammo().then(function(Ammo) {
         addCube(cube_2, -140, -100, 5);
         addCube(cube_3, -140, -80,  5);
 
-        gui.add(cube_1.position, 'y').min(0).max(10000).step(1).name('Cube 1 y');
-        gui.add(cube_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+        if(GUI_DEBUG_ENABLE == true) {
+            gui.add(cube_1.position, 'y').min(0).max(10000).step(1).name('Cube 1 y');
+            gui.add(cube_1.position, 'z').min(-10000).max(10000).step(1).name('Cube 1 z');
+        }
 
     }, undefined, function ( error ) {
         console.error( error );
@@ -403,16 +433,17 @@ Ammo().then(function(Ammo) {
     controls.maxDistance = 700;
 
 
-    gui.add(scene.fog, 'near').min(10).max(1000).step(1).name("Fog Near");
-    gui.add(scene.fog, 'far').min(1000).max(10000).step(1).name("Fog Far");
+    if(GUI_DEBUG_ENABLE == true) {
 
+        gui.add(scene.fog, 'near').min(10).max(1000).step(1).name("Fog Near");
+        gui.add(scene.fog, 'far').min(1000).max(10000).step(1).name("Fog Far");
 
-    gui.add(controls, 'maxDistance').min(1000).max(30000).step(1).name("Controls MaxDistance");
+        gui.add(controls, 'maxDistance').min(1000).max(30000).step(1).name("Controls MaxDistance");
 
-
-    gui.add(camera.position, 'x').min(1).max(10000).step(1).name("Camera x");
-    gui.add(camera.position, 'y').min(1).max(10000).step(1).name("Camera y");
-    gui.add(camera.position, 'z').min(1).max(10000).step(1).name("Camera z");    
+        gui.add(camera.position, 'x').min(1).max(10000).step(1).name("Camera x");
+        gui.add(camera.position, 'y').min(1).max(10000).step(1).name("Camera y");
+        gui.add(camera.position, 'z').min(1).max(10000).step(1).name("Camera z");    
+    }
 
 
     // camera.position.y = 1;
@@ -473,10 +504,12 @@ Ammo().then(function(Ammo) {
         // container.innerHTML = "";
         // container.appendChild( renderer.domElement );
 
-        // stats = new Stats();
-        // stats.domElement.style.position = 'absolute';
-        // stats.domElement.style.top = '0px';
-        // container.appendChild( stats.domElement );
+        if(STATS_DEBUG_ENABLE == true) {
+            // stats = new Stats();
+            // stats.domElement.style.position = 'absolute';
+            // stats.domElement.style.top = '0px';
+            // container.appendChild( stats.domElement );
+        }
 
         // window.addEventListener( 'resize', onWindowResize, false );
         window.addEventListener( 'keydown', keydown);
@@ -680,7 +713,7 @@ Ammo().then(function(Ammo) {
         function sync(dt) {
 
             var speed = vehicle.getCurrentSpeedKmHour();
-            console.log(speed);
+            // console.log(speed);
 
             // speedometer.innerHTML = (speed < 0 ? '(R) ' : '') + Math.abs(speed).toFixed(1) + ' km/h';
 
@@ -736,8 +769,6 @@ Ammo().then(function(Ammo) {
 
 
             let pre_fr_y = wheelMeshes[0].rotation.y;
-            // console.log(wheelMeshes[0], tyres[0])
-            
 
             var tm, p, q, i;
             var n = vehicle.getNumWheels();
@@ -748,41 +779,43 @@ Ammo().then(function(Ammo) {
                 q = tm.getRotation();
                 wheelMeshes[i].position.set(p.x(), p.y(), p.z());
                 wheelMeshes[i].quaternion.set(q.x(), q.y(), q.z(), q.w());
-
                 
 
-                if(Math.abs(speed) < 1.2 || tyres.length == 0)
+                if(tyres.length == 0)
                     continue;
 
-                var sclRotation = 0.05 * ( (speed / 25) + 1 );
+
+                if(i < 2) {
+                    if(vehicleSteering > 0)
+                        tyres[i].rotation.z = Math.PI / 6;
+                    else if(vehicleSteering < 0)
+                        tyres[i].rotation.z = -Math.PI / 6;
+                    else
+                    tyres[i].rotation.z = 0;
+                }
+
+
+                if(Math.abs(speed) < 1.2)
+                    continue;
+
+
+
+                var sclRotation = 0.02 * ( (speed / 15) + 1 );
                 if(engineForce > 0) {
-                    // tyres[i].rotation.x += Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
                     tyres[i].rotation.x += sclRotation;
                     lastCoeff = 1;
                 } else if(engineForce < 0) {
-                    // tyres[i].rotation.x += (-1) * Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
                     tyres[i].rotation.x -= sclRotation;
                     lastCoeff = -1;
                 } else {
-                    // tyres[i].rotation.x += lastCoeff * Math.abs(wheelMeshes[0].rotation.y - pre_fr_y) * 1.5;
                     tyres[i].rotation.x += lastCoeff * sclRotation;
                 }
 
+                // tyres[i].rotation.y = Math.PI / 6;
+                
                 
 
-                // if(i < 2) {
-                //     if(vehicleSteering > 0.2)
-                //         tyres[i].rotation.z = Math.PI/4;
-                //     else if(vehicleSteering < -0.2)
-                //     tyres[i].rotation.z = -Math.PI/4;
-                //     else 
-                //         tyres[i].rotation.z = 0.3;
-                // }
-
-
             }
-
-            // tyre_fr.rotation.x += Math.abs(wheelMeshes[0].rotation.y - pre_fr);
 
             tm = vehicle.getChassisWorldTransform();
             p = tm.getOrigin();
@@ -822,7 +855,9 @@ Ammo().then(function(Ammo) {
 
         requestAnimationFrame(animate);
 
-        stats.begin();
+        if(STATS_DEBUG_ENABLE == true) {
+            stats.begin();
+        }
 
 
         var dt = clock.getDelta();
@@ -840,43 +875,57 @@ Ammo().then(function(Ammo) {
             car.quaternion.set(vRot.x(), vRot.y(), vRot.z(), vRot.w());
         }
 
-        // tyre_fr.rotation.x += 0.1;
-        if(window.wheels !== null) {
-            // console.log(window.wheels[0].rotation)
-            
-        //     // tyre_fr.rotation.x = window.wheels[0].rotation.y / Math.PI;
-            // tyre_fr.rotation.x = window.wheels[0].rotation.y;
-
-        //     // tyre_fl.rotation.x = window.wheels[1].rotation.y / Math.PI;
-        //     tyre_fl.rotation.z = window.wheels[1].rotation.x;
-
-        //     // tyre_br.rotation.x = window.wheels[2].rotation.y / Math.PI;
-        //     tyre_br.rotation.z = window.wheels[2].rotation.x;
-
-        //     // tyre_bl.rotation.x = window.wheels[3].rotation.y / Math.PI;
-        //     tyre_bl.rotation.z = window.wheels[3].rotation.x;
-        }
-                    
-
-
         renderer.render( scene, camera );
         time += dt;
 
 
-        stats.end();
+        if(STATS_DEBUG_ENABLE == true) {
+            stats.end();
+        }
     };
 
 
+    var landmarks = [ 
+                    [10,  15],  [11,  15],  [10,  16],  [11,  16],  
+                    [-10, 15],  [-10, 16],  [-10, 17],  [-10, 18], [-9, 18],
+                    [-10, -15], [-11, -15], [-12, -15], [-13, -15],
+                    [10,  -11], [10,  -12], [10,  -13], [10,  -14]
+                ]
 
-    // console.log(data);
+    function calcLandmark(lmark, car_x, car_z, car_angle, std_rng, std_brg) {
+    
+        // x, z = sim_pos[0, 0], sim_pos[1, 0]
+        const lmark_x = lmark[0] * 10
+        const lmark_z = lmark[1] * 10
+        var d = Math.sqrt( Math.pow(lmark_x - car_x, 2) + Math.pow(lmark_z - car_z, 2) )  
+        
+        var a = Math.atan2(lmark_z - car_z, lmark_x - car_x) - car_angle // sim_pos[2, 0]
+        a = a + Math.random() * std_brg
+        // a = ( a >= 0) ? a : a + Math.PI;
+
+        var z = [   ( d + Math.random() * std_rng ) / 10,
+                      a ]
+
+        return `${z[0].toFixed(3)},${z[1].toFixed(3)}`
+    }
+
+
+    const std_vel = 0.1;
+    const std_steer = 1;
+    const std_range = 0.3;
+    const std_bearing = 0.1;
+    const prior_cov_pos = 0.1 
+    const prior_cov_angle = 0.1
+    const start_angle = 1.5;
 
     var tid = setTimeout(carMoveMonitor, 1000);
     var startX = null;
     var startY = null;
     var isPrior = true;
+
     function carMoveMonitor() {
         
-        if(car != null) {
+        if(car != null && state == State.running) {
 
             if(startX === null) {
                 startX = car.position.x;
@@ -890,32 +939,44 @@ Ammo().then(function(Ammo) {
                 var currY = car.position.z - startY;
 
                 var r = Math.sqrt( Math.pow(currX, 2) + Math.pow(currY, 2) )
-                const noiseScale = 5;
-                r = ( r + Math.random() * noiseScale ) - (noiseScale / 2);
+                // const noiseScale = 5;
+                // r = ( r + Math.random() * noiseScale ) - (noiseScale / 2);
 
                 var theta = Math.atan2(currY, currX)
+                theta = (theta > 1e-4) ? theta : 1e-4;
 
-                let u = `${r}, ${theta}`
-                // console.log(content);
+                let u = `${r.toFixed(4)}, ${theta.toFixed(4)}`
+                
+                const car_x = car.position.x;
+                const car_z = car.position.z;
+
+                const car_angle = ( car.rotation.y > 1e-4 ) ? car.rotation.y : 1e-4;
+                var observations = ""
+                for(var j = 0; j < landmarks.length; j++) {
+                    if(observations !== "")
+                        observations += ";";
+                    observations +=  calcLandmark(landmarks[j], car_x, car_z, car_angle, std_range, std_bearing)
+                }
+                // console.log(observations)
 
                 if(isPrior == true) {
 
-                    let std_vel = 0.1;
-                    let std_steer = 1;
-                    let std_range = 0.3;
-                    let std_bearing = 0.1;
-                    let prior_cov_pos = 0.1 
-                    let prior_cov_angle = 0.1
+                    // console.log("Car Angle ", car_angle);
+                    var lands = "";
+                    for(var j = 0; j < landmarks.length; j++) {
+                        if(lands !== "")
+                            lands += ";";
+                        lands += `${landmarks[j][0]},${landmarks[j][1]}`
+                    }
 
                     ipcRenderer.send('ekf_localization:tcp:send:prior', 
-                        u, std_vel, std_steer, std_range, std_bearing, prior_cov_pos, prior_cov_angle);
+                        u, std_vel, std_steer, std_range, std_bearing, start_angle, prior_cov_pos, prior_cov_angle, 
+                        observations, lands);
                     isPrior = false;
 
                 } else {
-                    ipcRenderer.send('ekf_localization:tcp:send:measurements', u);
+                    ipcRenderer.send('ekf_localization:tcp:send:measurements', u, observations);
                 }
-
-                // fs.appendFileSync('./ekf_localization/mo_u.txt', content+"\r\n" );
 
                 startX = car.position.x;
                 startY = car.position.z;
@@ -988,10 +1049,6 @@ function setup() {
     drawBackground();
     drawLegends();
 
-    // pathResult = fs.readFileSync('./ekf_localization/result.txt', { encoding:'utf8', flag:'r' }).split('\n');
-
-    // stroke(0);
-    // strokeWeight(2);
     
     frameRate(3);
 }
