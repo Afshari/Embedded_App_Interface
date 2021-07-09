@@ -1,0 +1,525 @@
+<%- include('./partial_imports/import_above_content.ejs', { Title: "Estimating AirSuspension with Kalman Filter", PageAddr: 'kf_air_suspension' } ) %>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-theme"   id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-warning" id="btnMiss">Add Miss Detection</button>
+    <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
+    <button type="button" class="btn btn-success" id="btnRandomClutter">Add Random Clutter</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+</div>
+
+
+<main>
+</main>
+
+
+<%- include('./partial_imports/import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+
+var linearAlgebra = require('linear-algebra')(),     // initialise it
+                    Vector = linearAlgebra.Vector,
+                    Matrix = linearAlgebra.Matrix;
+
+var Enum = require('enum');
+
+var State = new Enum( { 
+
+    'ready': 1,
+    'sendingMeasurements': 2,
+    'drawing': 3
+} )
+
+var state = State.ready;
+var rnd = 1;
+
+$(document).ready( () => {
+
+    $("#btnConnect").click( () => {
+
+        ipcRenderer.send('estimating_air_suspension:connect');
+    } );
+
+    $("#btnRun").click( () => {
+
+        ipcRenderer.send('estimating_air_suspension:send:measurements', estimator.Y.data[0], rnd);
+    } );
+
+} );
+
+ipcRenderer.on('estimating_air_suspension:get:values', (event, values) => {
+
+    values = values.split(';');
+    console.log(values.length);
+
+    // rnd += 1;
+    console.log(rnd);
+
+    if(rnd <= estimator.Tf) {
+
+        for(var i = 0; i < 1000; i++) {
+
+            vals_0_hat[ ((rnd-1)*1000) + i] = parseInt( values[i].split(',')[0] );
+
+            vals_1_hat[ ((rnd-1)*1000) + i] = parseInt( values[i].split(',')[1] );
+        }
+        if(rnd < estimator.Tf) {
+            rnd += 1;
+            ipcRenderer.send('estimating_air_suspension:send:measurements', estimator.Y.data[0], rnd);
+        } else {
+            state = State.drawing;
+        }
+    } else {
+        state = State.drawing;
+    }
+
+})
+
+class SuspensionEstimator {
+
+    constructor() {
+
+        // Model Parameters
+        const ms = 972.2;                  // Sprung mass
+        const mu = 113.6;                  // Unsprung mass
+        const ks = 42719.6;                // Stiffness of the suspension
+        const kt = 101115;                 // Compressibility of the Tyre
+        const cs = 1095;                   // Damping of the suspension
+        const ct = 14.6;                   // Damping of the pneumatic Tyre
+
+
+        const A = new Matrix([  [   0,       0,       1,       -1           ],
+                                [   0,       0,       0,        1           ],
+                                [  -ks/ms,   0,       -cs/ms,   cs/ms       ],
+                                [   ks/mu,  -kt/mu,   cs/mu,    -(cs+ct)/mu ] ]);
+
+        const L = Matrix.reshapeFrom( [ 0, -1, 0, ct/mu ], 4, 1 );
+        const dt = 0.001;
+        this.Tf = 12;
+        this.n = this.Tf / dt;
+
+        // Process noise variance
+        const n0 = 0.1;                      // Reference spatial frequency
+        const V  = 25/3.6;                   // Vehicle forward velocity (m/s)
+        const Gqn0 = 16*1e-6;                // Road roughness coefficient
+        const Qc = 4 * Math.PI * Gqn0 * ( n0 ** 2 ) * V;
+        this.F =  new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
+                                [ 1.87325040e-04,  9.99556443e-01,  4.86406564e-06,  9.94923911e-04],
+                                [-4.37024544e-02, -5.05893846e-04,  9.98857916e-01,  1.14184268e-03],
+                                [ 3.73930206e-01, -8.85578620e-01,  9.77200224e-03,  9.89656572e-01] ] );
+
+        this.Q   =  new Matrix([  [  0.0000,    0.0000,   -0.0000,   -0.0000],
+                                  [  0.0000,    0.2233,   -0.0001,   -0.1276],
+                                  [ -0.0000,   -0.0001,    0.0000,    0.0000],
+                                  [ -0.0000,   -0.1276,    0.0000,    0.0875] ] );
+        // this.Q = this.Q * 1e-6;
+
+        this.H = Matrix.reshapeFrom( [1, 0, 0, 0], 1, 4 );
+        this.R = new Matrix( [ (1e-3)**2 ] );
+
+        this.nx = this.F.rows;
+        this.ny = this.H.rows;
+
+        this.x = Matrix.zero(this.nx, this.n);
+        this.Y = Matrix.zero(this.ny, this.n);
+
+        // Initial guesses for the state mean and covariance.
+        this.m = new Matrix( [0, 0, 0, 0] );
+        this.C = Matrix.zero( 4 ); 
+        this.C.data[0][0] = 0.1;
+    }
+
+    init() {
+
+        SuspensionEstimator.replaceMatrixColumn(this.x, [0.1, 0, 0, 0], 0);
+
+        for(var i = 0; i < this.n - 1; i++)
+            SuspensionEstimator.genData(this.F, this.x, i);
+            
+        for(i = 0; i < this.n; i++)
+            SuspensionEstimator.setMeasurement(this.H, this.x, this.Y, i);
+
+    }
+
+
+    static replaceMatrixColumn(arr, val, idx) {
+
+        arr.data[0][idx] = val[0];
+        arr.data[1][idx] = val[1];
+        arr.data[2][idx] = val[2];
+        arr.data[3][idx] = val[3];
+    }
+
+    static setMeasurement(H, x, Y, idx) {
+
+        let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
+
+        let t_x = H.dot( n_x ).data;
+
+        Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.01 ) ) * 333 );
+    }
+
+    static genData(F, x, idx) {
+
+        let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
+
+        let t_x = F.dot( n_x ).data;
+
+        x.data[0][idx+1] = t_x[0][0] + ( (Math.random()-0.5) * 0.005 );
+        x.data[1][idx+1] = t_x[1][0] + ( (Math.random()-0.5) * 0.005 );
+        x.data[2][idx+1] = t_x[2][0] + ( (Math.random()-0.5) * 0.005 );
+        x.data[3][idx+1] = t_x[3][0] + ( (Math.random()-0.5) * 0.005 );
+    }
+
+}
+
+var estimator = new SuspensionEstimator();
+console.log( estimator )
+estimator.init();
+
+
+const windowWidth = 900;
+const windowHeight = 600;
+const halfWidth = windowWidth / 2;
+
+// // Model Parameters
+// const ms = 972.2;                  // Sprung mass
+// const mu = 113.6;                  // Unsprung mass
+// const ks = 42719.6;                // Stiffness of the suspension
+// const kt = 101115;                 // Compressibility of the Tyre
+// const cs = 1095;                   // Damping of the suspension
+// const ct = 14.6;                   // Damping of the pneumatic Tyre
+
+
+// const A = new Matrix([  [   0,       0,       1,       -1           ],
+//                         [   0,       0,       0,        1           ],
+//                         [  -ks/ms,   0,       -cs/ms,   cs/ms       ],
+//                         [   ks/mu,  -kt/mu,   cs/mu,    -(cs+ct)/mu ] ]);
+
+// const L = Matrix.reshapeFrom( [ 0, -1, 0, ct/mu ], 4, 1 );
+// const dt = 0.001;
+// const Tf = 12;
+// const n = Tf / dt;
+
+// // Process noise variance
+// const n0 = 0.1;                      // Reference spatial frequency
+// const V  = 25/3.6;                   // Vehicle forward velocity (m/s)
+// const Gqn0 = 16*1e-6;                // Road roughness coefficient
+// const Qc = 4 * Math.PI * Gqn0 * ( n0 ** 2 ) * V;
+// const F = new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
+//                         [ 1.87325040e-04,  9.99556443e-01,  4.86406564e-06,  9.94923911e-04],
+//                         [-4.37024544e-02, -5.05893846e-04,  9.98857916e-01,  1.14184268e-03],
+//                         [ 3.73930206e-01, -8.85578620e-01,  9.77200224e-03,  9.89656572e-01] ] );
+
+// let Q =   new Matrix([  [  0.0000,    0.0000,   -0.0000,   -0.0000],
+//                         [  0.0000,    0.2233,   -0.0001,   -0.1276],
+//                         [ -0.0000,   -0.0001,    0.0000,    0.0000],
+//                         [ -0.0000,   -0.1276,    0.0000,    0.0875] ] );
+// Q = Q * 1e-6;
+
+// const H = Matrix.reshapeFrom( [1, 0, 0, 0], 1, 4 );
+// const R = new Matrix( [ (1e-3)**2 ] );
+
+// const nx = F.rows;
+// const ny = H.rows;
+
+// let x = Matrix.zero(nx, n);
+// let Y = Matrix.zero(ny, n);
+
+// function replaceMatrixColumn(arr, val, idx) {
+
+//     arr.data[0][idx] = val[0];
+//     arr.data[1][idx] = val[1];
+//     arr.data[2][idx] = val[2];
+//     arr.data[3][idx] = val[3];
+// }
+
+// function genData(F, x, idx) {
+
+//     let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
+
+//     let t_x = F.dot( n_x ).data;
+
+//     x.data[0][idx+1] = t_x[0][0] + ( (Math.random()-0.5) * 0.005 );
+//     x.data[1][idx+1] = t_x[1][0] + ( (Math.random()-0.5) * 0.005 );
+//     x.data[2][idx+1] = t_x[2][0] + ( (Math.random()-0.5) * 0.005 );
+//     x.data[3][idx+1] = t_x[3][0] + ( (Math.random()-0.5) * 0.005 );
+// }
+
+// function setMeasurement(H, x, Y, idx) {
+
+//     let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
+
+//     let t_x = H.dot( n_x ).data;
+
+//     // Y.data[0][idx] = t_x[0][0] + ( (Math.random()-0.5) * 0.005 );
+//     Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.01 ) ) * 333 );
+// }
+
+// console.log( Array.isArray( estimator.x.data ) );
+
+// SuspensionEstimator.replaceMatrixColumn(estimator.x, [0.1, 0, 0, 0], 0);
+
+// // Generate the data.
+// // for i in range(1, n):
+// //     x[:,i] = F @ x[:,i-1] + normal(0, 0.001, 4)
+// for(var i = 0; i < estimator.n - 1; i++)
+//     SuspensionEstimator.genData(estimator.F, estimator.x, i);
+    
+// // Generate the measurements.
+// // for i in range(n):
+// //     Y[:, i] = H @ x[:, i] + normal(0, 0.001, 1)
+// for(i = 0; i < estimator.n; i++)
+//     SuspensionEstimator.setMeasurement(estimator.H, estimator.x, estimator.Y, i);
+
+// Initial guesses for the state mean and covariance.
+// let m = new Matrix( [0, 0, 0, 0] );
+// let C = Matrix.zero( 4 ); 
+// C.data[0][0] = 0.1;
+
+
+
+var counter;
+var vals_0, vals_1, vals_0_hat, vals_1_hat;
+
+function setup() {
+
+  createCanvas(windowWidth, windowHeight);
+  
+  strokeWeight(2);
+  
+  var tmpArray = [];
+  for(var i = 0; i < 1000; i++) {
+    tmpArray.push(100);
+  }
+//   vals_0 = tmpArray.concat(vals_0);
+//   vals_0_hat = tmpArray.concat(vals_0_hat);
+  
+  tmpArray = []
+  for(i = 0; i < 1000; i++) {
+    tmpArray.push(0);
+  }
+
+  vals_0 = new Array(estimator.n).fill(0);
+  vals_1  = new Array(estimator.n).fill(0);
+  vals_0_hat = new Array(estimator.n).fill(0); 
+  vals_1_hat = new Array(estimator.n).fill(0);
+
+//   vals_1 = tmpArray.concat(vals_1);
+//   vals_1_hat = tmpArray.concat(vals_1_hat);
+  
+  for(i = 0; i < vals_0.length; i++) {
+      
+    vals_0[i] = vals_0[i] / 3;
+    vals_0_hat[i] = vals_0_hat[i] / 3;
+    vals_1[i] = vals_1[i] / 3;
+    vals_1_hat[i] = vals_1_hat[i] / 3;
+
+    vals_0[i] = estimator.x.data[0][i] * 333;
+    vals_1[i] = estimator.x.data[1][i] * 333;
+    // vals_0_hat[i] = Y.data[0][i] * 333;
+  }
+
+//   console.log( vals_0.length, x.data[0].length );  
+  counter = windowWidth;
+}
+
+function draw() {
+
+
+    if(state == State.drawing) {
+
+        background(220);
+  
+        translate(0, 3*height/4);
+        // console.log(getFrameRate());
+        
+        var firstValue = counter - windowWidth;
+        for(var i = counter - windowWidth; i < counter; i++) {
+            stroke(255, 0, 0);
+            if(i <= counter - halfWidth) {
+                point(i - firstValue, (-1)*vals_1_hat[i]-250);
+                point(i - firstValue, (-1)*vals_0_hat[i]);  
+            }
+            
+            stroke(0);
+            point(i - firstValue, (-1)*vals_1[i] - 250);
+            point(i - firstValue, (-1)*vals_0[i]);
+        }
+        
+        //   if(counter >= 1350) {
+            
+            // Bottom Box
+            line(width/2+25, -vals_0[counter-halfWidth] - 50, 
+                 width/2+25, -vals_0[counter-halfWidth] - 185 );
+            line(width/2+45, -vals_0[counter-halfWidth] - 50, 
+                 width/2+45, -vals_0[counter-halfWidth] - 185 );
+
+
+            // Line Top-to-Bottom
+            line(width/2+35, -vals_1[counter-halfWidth] - 225, 
+                 width/2+35, -vals_1[counter-halfWidth] - 125 );
+            line(width/2+25, -vals_1[counter-halfWidth] - 125, 
+                 width/2+45, -vals_1[counter-halfWidth] - 125 );
+            
+            
+            line(width/2-35, -vals_1[counter-halfWidth] - 225, 
+                 width/2-35, -vals_1[counter-halfWidth] - 175 );
+            line(width/2-35, -vals_0[counter-halfWidth] - 50, 
+                 width/2-35, -vals_0[counter-halfWidth] - 100 );
+            
+            var pUp = -vals_1[counter-halfWidth] - 175;
+            var pBottom = -vals_0[counter-halfWidth] - 100;
+            
+            var p1 = pBottom - Math.abs(pUp - pBottom)/7;
+            var p2 = p1 - Math.abs(pUp - pBottom)/7;
+            var p3 = p2 - Math.abs(pUp - pBottom)/7;
+            var p4 = p3 - Math.abs(pUp - pBottom)/7;
+            var p5 = p4 - Math.abs(pUp - pBottom)/7;
+            var p6 = p5 - Math.abs(pUp - pBottom)/7;
+            
+            line(width/2-35, pBottom, width/2-45, p1);
+            line(width/2-45, p1, width/2-25, p2);
+            line(width/2-25, p2, width/2-45, p3);
+            line(width/2-45, p3, width/2-25, p4);
+            line(width/2-25, p4, width/2-45, p5);
+            line(width/2-45, p5, width/2-25, p6);
+            line(width/2-25, p6, width/2-35, pUp);
+        
+        //   } else {
+            
+        //     // Bottom Box
+        //     line(width/2+25, -vals_0[counter-halfWidth] - 50, 
+        //          width/2+25, -vals_0[counter-halfWidth] - 150 );
+        //     line(width/2+45, -vals_0[counter-halfWidth] - 50, 
+        //          width/2+45, -vals_0[counter-halfWidth] - 150 );
+
+
+        //     // Line Top-to-Bottom
+        //     line(width/2+35, -vals_1[counter-halfWidth] - 225, 
+        //          width/2+35, -vals_1[counter-halfWidth] - 150 );
+        //     line(width/2+25, -vals_1[counter-halfWidth] - 150, 
+        //          width/2+45, -vals_1[counter-halfWidth] - 150 );
+            
+            
+        //     line(width/2-35, -vals_1[counter-halfWidth] - 225, 
+        //          width/2-35, -vals_1[counter-halfWidth] - 200 );
+        //     line(width/2-35, -vals_0[counter-halfWidth] - 50, 
+        //          width/2-35, -vals_0[counter-halfWidth] - 75 );
+            
+        //     pUp = -vals_1[counter-halfWidth] - 200;
+        //     pBottom = -vals_0[counter-halfWidth] - 75;
+        //     p1 = pBottom - Math.abs(pUp - pBottom)/7;
+        //     p2 = p1 - Math.abs(pUp - pBottom)/7;
+        //     p3 = p2 - Math.abs(pUp - pBottom)/7;
+        //     p4 = p3 - Math.abs(pUp - pBottom)/7;
+        //     p5 = p4 - Math.abs(pUp - pBottom)/7;
+        //     p6 = p5 - Math.abs(pUp - pBottom)/7;
+
+            
+        //     line(width/2-35, pBottom, width/2-45, p1);
+        //     line(width/2-45, p1, width/2-25, p2);
+        //     line(width/2-25, p2, width/2-45, p3);
+        //     line(width/2-45, p3, width/2-25, p4);
+        //     line(width/2-25, p4, width/2-45, p5);
+        //     line(width/2-45, p5, width/2-25, p6);
+        //     line(width/2-25, p6, width/2-35, pUp);
+
+        //   }
+        
+        fill(220);
+        rectMode(CENTER);
+        rect(width/2, -vals_1[counter-halfWidth] - 250, 150, 50);
+        ellipseMode(CENTER);
+        fill(0);
+        circle(width/2, -vals_0[counter-halfWidth], 30);
+        
+        line(width/2-50, -vals_0[counter-halfWidth] - 50, 
+            width/2+50, -vals_0[counter-halfWidth] - 50 );
+        
+        line(width/2, -vals_0[counter-halfWidth], 
+            width/2, -vals_0[counter-halfWidth]-50 )
+        
+            
+        if(counter < vals_1.length - 15)
+            counter += 15;
+        else
+            noLoop();
+
+    }
+  
+}
+
+
+// let measurementColor = [ 0, 0, 0, 170 ]
+// let groundtruthColor = [ 0, 0, 255, 255 ]
+// let estimatedMeanColor = [ 255, 140, 0, 255 ]
+// let estimatedCovarColor = [ 255, 0, 0, 90 ]
+// let missDetectionColor = [ 255, 0, 0, 255 ]
+// let measurementCircleRadius = 5
+
+// function drawLegends() {
+
+//     fill(0, 102, 153);
+//     noStroke()
+//     textSize(12);
+//     textAlign(LEFT, CENTER);
+//     text('Measurements', 40, 30)
+//     text('Ground Truth', 40, 50)
+//     text('Estimated Mean', 40, 70)
+//     // text('Estimated Covariance', 40, 90)
+//     text('Miss Detection', 40, 90)
+
+
+//     noStroke()
+//     fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+//     circle(20, 30, measurementCircleRadius*2)
+
+//     fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+//     circle(20, 50, measurementCircleRadius)
+//     stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+//     strokeWeight(1.5)
+//     line(10, 50, 30, 50)
+
+//     noStroke()
+//     fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+//     circle(20, 70, measurementCircleRadius*2)
+
+
+//     noStroke()
+//     fill(missDetectionColor[0], missDetectionColor[1], missDetectionColor[2], missDetectionColor[3])
+//     circle(20, 90, measurementCircleRadius*2)
+
+// }
+
+// function drawBackground() {
+
+//     background(230, 230, 230);
+//     fill(210, 210, 210);
+//     strokeWeight(2);
+//     stroke(170);
+//     rect(0, 0, windowWidth, windowHeight);
+// }
+
+
+// function setup() {
+    
+//     createCanvas(windowWidth, windowHeight)
+    
+//     drawBackground()
+
+//     drawLegends()
+
+//     stroke(0)
+//     strokeWeight(2)
+//     frameRate(40);
+// }
+
+// function draw() {
+
+// }
+
+
+
+</script>

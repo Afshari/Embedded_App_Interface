@@ -1,4 +1,4 @@
-<%- include('./import_above_content.ejs', { Title: "Recursive Least Squares", PageAddr: 'rls' } ) %>
+<%- include('./partial_imports/import_above_content.ejs', { Title: "Recursive Least Squares", PageAddr: 'rls' } ) %>
 
 <div class="row mt">
     <div class="col-lg-12">
@@ -83,7 +83,7 @@
 	</div>
 </div>
 
-<%- include('./import_below_content.ejs', { renderChartJS: true  } ) %>
+<%- include('./partial_imports/import_below_content.ejs', { renderChartJS: true  } ) %>
 <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"  id="MathJax-script" ></script> -->
 <link rel="stylesheet" href="lib/katex/katex.min.css" integrity="sha384-AfEj0r4/OFrOo5t7NnNe46zW/tFgW6x/bCJG8FqQCEo3+Aro6EYUG4+cU+KJWu/X" crossorigin="anonymous">
 <!-- The loading of KaTeX is deferred to speed up page rendering -->

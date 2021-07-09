@@ -14,8 +14,10 @@ const lite_ids = require('./lite_ids');
 const a_star = require('./a_star');
 const siamfc = require('./siamfc');
 const kf_tracking = require('./kf_tracking');
+const kf_air_suspension = require('./kf_air_suspension');
 const ekf_localization = require('./ekf_localization');
 const detectron_tracking = require('./detectron_tracking');
+
 
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
@@ -58,6 +60,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	else if(lastPage === 'a_star.ejs')				a_star.deactivate();
 	else if(lastPage === 'siamfc.ejs') 				siamfc.deactivate();
 	else if(lastPage === 'kf_tracking.ejs')			kf_tracking.deactivate();
+	else if(lastPage === 'kf_air_suspension.ejs')	kf_air_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')	ekf_localization.deactivate();
 
 
@@ -101,6 +104,10 @@ ipcMain.on("menu:page:change", function(event, addr) {
 		ekf_localization.init(win);
 		win.loadFile('front_end/ekf_localization.ejs');
 
+	} else if(addr === 'kf_air_suspension.ejs') {
+
+		kf_air_suspension.init(win);
+		win.loadFile('front_end/kf_air_suspension.ejs');
 	}
 
 	lastPage = addr;
