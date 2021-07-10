@@ -13,4 +13,6 @@ Currently this is the interface of my Projects such as:
 * Path Finding with A*
 
 
+./node_modules/.bin/electron-rebuild
+
 I'm working on other projects as well, and I will add more features to this project in the future.

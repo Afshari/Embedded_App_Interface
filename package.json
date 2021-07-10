@@ -5,25 +5,27 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "ejs-electron": "^2.1.1",
-    "electron": "^11.2.3",
     "electron-rebuild": "^2.3.5",
-    "line-reader": "^0.4.0"
+    "jest": "^27.0.6"
   },
   "dependencies": {
+    "bindings": "^1.5.0",
     "bluebird": "^3.7.2",
     "dat.gui": "^0.7.7",
+    "ejs-electron": "^2.1.1",
+    "electron": "^11.2.3",
     "electron-context-menu": "^2.4.0",
     "enum": "^3.0.4",
     "glob": "^7.1.7",
     "glob-fs": "^0.1.5",
     "katex": "^0.12.0",
+    "line-reader": "^0.4.0",
     "linear-algebra": "^3.1.4",
     "mathjax": "^3.1.2",
     "mathjax-electron": "^3.0.0",

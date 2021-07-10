@@ -1,10 +1,11 @@
 <%- include('./partial_imports/import_above_content.ejs', { Title: "Estimating AirSuspension with Kalman Filter", PageAddr: 'kf_air_suspension' } ) %>
 
 <div style="margin: 5px;">
-    <button type="button" class="btn btn-theme"   id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-info"   id="btnConnect">Connect</button>
     <button type="button" class="btn btn-warning" id="btnPause">Pause</button>
     <button type="button" class="btn btn-theme" id="btnStep">Step</button>
     <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+    <button type="button" class="btn btn-theme" id="btnReset">Reset</button>
 </div>
 
 
@@ -36,52 +37,32 @@ const drawHelper = new DrawHelper( estimator, windowWidth );
 var handleWorkFlow = new HandleWorkFlow( estimator, ipcRenderer, windowWidth );
 console.log( handleWorkFlow );
 
-var rnd = 1;
 
 $(document).ready( () => {
 
     $("#btnConnect").click( () => {
 
-        handleWorkFlow.connect();
-        // ipcRenderer.send('estimating_air_suspension:connect');
+        handleWorkFlow.handleConnect();
     });
 
     $("#btnPause").click( () => {
-        // if(state == State.running) {
-        if( handleWorkFlow.isStateRunning() ) {
-            // state = State.pause;
-            handleWorkFlow.state2Pause();
-            frameRate(4);
-        }
+
+        handleWorkFlow.handlePause();
+    });
+
+    $("#btnReset").click( () => {
+
+        handleWorkFlow.handleReset();
     });
 
     $("#btnStep").click( () => {
 
-        // if(state == State.pause) {
-        if( handleWorkFlow.isStatePause() ) {
-            // if(counter < estimator.n - 15)
-                // counter += 15;
-            if( handleWorkFlow.counter < estimator.n - 15)
-                handleWorkFlow.counter += 15;
-        }
+        handleWorkFlow.handleStep();
     });
 
     $("#btnRun").click( () => {
 
-        // if(state == State.ready) {
-        if( handleWorkFlow.isStateReady() ) {
-
-            // state = State.sendingMeasurements;
-            handleWorkFlow.state2SendingMeasurements();
-            ipcRenderer.send('estimating_air_suspension:send:measurements', estimator.Y.data[0], rnd);
-
-        // } else if(state == State.pause) {
-        } else if( handleWorkFlow.isStatePause() ) {
-            // state = State.running;
-            handleWorkFlow.state2Running();
-            frameRate(40);
-        }
-        
+        handleWorkFlow.handleRun();        
     });
 
 } );
@@ -90,39 +71,15 @@ ipcRenderer.on('estimating_air_suspension:get:values', (event, values) => {
 
     values = values.split(';');
 
-    // console.log(values.length);
-    // console.log(rnd);
-
-    if(rnd <= estimator.Tf && handleWorkFlow.isStateSendingMeasurements() ) {
-
-        for(var i = 0; i < 1000; i++) {
-
-            estimator.setTyreEstimated( ((rnd-1)*1000) + i, parseInt( values[i].split(',')[0] ) );
-
-            estimator.setSuspensionEstimated( ((rnd-1)*1000) + i, parseInt( values[i].split(',')[1] ) );
-        }
-        if(rnd < estimator.Tf) {
-            rnd += 1;
-            ipcRenderer.send('estimating_air_suspension:send:measurements', estimator.Y.data[0], rnd);
-        } else {
-            // state = State.running;
-            handleWorkFlow.state2Running();
-            frameRate(40);
-        }
-    } 
-
+    handleWorkFlow.handleReceivedValues( values );
 })
 
 
-// var counter;
 
 function setup() {
 
   createCanvas(windowWidth, windowHeight);
-  
   strokeWeight(2);  
-
-//   counter = windowWidth;
   frameRate(4);
 
 }
@@ -164,7 +121,6 @@ function draw() {
 
     drawBackground();
 
-    // if(state == State.running || state == State.pause) {
     if( handleWorkFlow.isStateRunning() || handleWorkFlow.isStatePause()  ) {
   
         translate(0, 3*height/4);
@@ -202,14 +158,12 @@ function draw() {
              width/2, estimator.getTyreTruth(handleWorkFlow.counter-halfWidth) - 50 );
         
             
-        // if(state == State.running) {
         if( handleWorkFlow.isStateRunning() ) {
 
             if( handleWorkFlow.counter < estimator.n - 15 )
                 handleWorkFlow.counter += 15;
             else {
                 handleWorkFlow.state2Finish();
-                // state = State.finish;
                 noLoop();
             }
         }

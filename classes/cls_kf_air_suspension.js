@@ -86,27 +86,27 @@ class SuspensionEstimator {
     }
 
     getTyreTruth(i) {
-        return -this.x.data[0][i] * SuspensionEstimator.scl;
-    }
-
-    getSuspensionTruth(i) {
         return -this.x.data[1][i] * SuspensionEstimator.scl;
     }
 
     setTyreEstimated(i, value) {        
-        this.xhat.data[0][i] = value;
-    }
-
-    getTyreEstimated(i) {
-        return -this.xhat.data[0][i];
-    }
-
-    setSuspensionEstimated(i, value) {        
         this.xhat.data[1][i] = value;
     }
 
-    getSuspensionEstimated(i, value) {
+    getTyreEstimated(i) {
         return -this.xhat.data[1][i];
+    }
+
+    getSuspensionTruth(i) {
+        return -this.x.data[0][i] * SuspensionEstimator.scl;
+    }
+
+    setSuspensionEstimated(i, value) {        
+        this.xhat.data[0][i] = value;
+    }
+
+    getSuspensionEstimated(i, value) {
+        return -this.xhat.data[0][i];
     }
 
     static replaceMatrixColumn(arr, val, idx) {
@@ -149,49 +149,92 @@ class HandleWorkFlow {
         this.ipcRenderer = ipcRenderer;
         this.windowWidth = windowWidth;
         this.counter = windowWidth;
+        this.rnd = 1;
 
-        // console.log( this.ipcRenderer );
     }
 
-    connect() {
+    handleConnect() {
         this.ipcRenderer.send('estimating_air_suspension:connect');
     }
 
-    isStateReady() {
-        return this.state == State.ready;
+    handleStep() {
+
+        if( this.isStatePause() ) {
+
+            if( this.counter < this.estimator.n - 15 )
+                this.counter += 15;
+        } else if( this.isStateRunning() ) {
+            
+            window.showFlashMessage( "Algorithm is Running", "WARNING" )
+        }
     }
 
-    isStateSendingMeasurements() {
-        return this.state == State.sendingMeasurements;
+    handlePause() {
+
+        if( this.isStateRunning() ) {
+            
+            this.state2Pause();
+            window.frameRate(4);
+        }
     }
 
-    isStateRunning() {
-        return this.state == State.running;
+    handleRun( ) {
+
+        if( this.isStateReady() ) {
+
+            this.state2SendingMeasurements();
+            this.ipcRenderer.send('estimating_air_suspension:send:measurements', estimator.Y.data[0], this.rnd);
+
+        } else if( this.isStatePause() ) {
+
+            this.state2Running();
+            window.frameRate(40);
+        }
     }
 
-    isStatePause() {
-        return this.state == State.pause;
+    handleReset() {
+        
     }
 
-    isStateFinish() {
-        return this.state == State.finish;
+    handleReceivedValues( values ) {
+
+        if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
+
+            for(var i = 0; i < 1000; i++) {
+    
+                this.estimator.setTyreEstimated( ((this.rnd-1)*1000) + i, parseInt( values[i].split(',')[1] ) );
+                this.estimator.setSuspensionEstimated( ((this.rnd-1)*1000) + i, parseInt( values[i].split(',')[0] ) );
+            }
+            if(this.rnd < this.estimator.Tf) {
+
+                this.rnd += 1;
+                this.ipcRenderer.send('estimating_air_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
+            } else {
+    
+                this.state2Running();
+                window.frameRate(40);
+            }
+        } 
     }
 
-    state2Pause() {
-        this.state = State.pause;
-    }
 
-    state2Running() {
-        this.state = State.running;
-    }
+    isStateReady() { return this.state == State.ready; }
 
-    state2SendingMeasurements() {
-        this.state = State.sendingMeasurements;
-    }
+    isStateSendingMeasurements() { return this.state == State.sendingMeasurements; }
 
-    state2Finish() {
-        this.state = State.finish;
-    }
+    isStateRunning() { return this.state == State.running; }
+
+    isStatePause() { return this.state == State.pause; }
+
+    isStateFinish() { return this.state == State.finish; }
+
+    state2Pause() { this.state = State.pause; }
+
+    state2Running() { this.state = State.running; }
+
+    state2SendingMeasurements() { this.state = State.sendingMeasurements; }
+
+    state2Finish() { this.state = State.finish; }
 
 
 }
@@ -206,7 +249,6 @@ class DrawHelper {
     }
 
     suspensionOffset() {
-        // return -250;
         return -225;
     }
 
