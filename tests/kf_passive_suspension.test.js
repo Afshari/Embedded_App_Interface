@@ -1,5 +1,5 @@
 
-const { SuspensionEstimator, DrawHelper, HandleWorkFlow } = require('../classes/cls_kf_air_suspension');
+const { SuspensionEstimator, DrawHelper, HandleWorkFlow } = require('../classes/cls_kf_passive_suspension');
 
 
 describe( ' Draw Helper ', () => {

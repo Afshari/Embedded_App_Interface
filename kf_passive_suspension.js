@@ -21,14 +21,6 @@ function init(win) {
 
     mainWindow = win
 
-    // const timeoutObj = setTimeout(function () {
-        
-    //     connect()
-        
-    //     _isActive = true;
-
-    // clearTimeout(timeoutObj)
-    // }, 2000)
 }
 
 function isActive() {
@@ -58,12 +50,12 @@ function connect() {
     });
 }
 
-ipcMain.on('estimating_air_suspension:connect', (event) => {
+ipcMain.on('estimating_passive_suspension:connect', (event) => {
 
     connect();
 })
 
-ipcMain.on('estimating_air_suspension:send:measurements', (event, data, rnd) => {
+ipcMain.on('estimating_passive_suspension:send:measurements', (event, data, rnd) => {
 
     let dataStr = "";
     // console.log(data.length);
@@ -84,7 +76,7 @@ ipcMain.on('estimating_air_suspension:send:measurements', (event, data, rnd) => 
 client.on('data', function(data) {
 
     data = data.toString();
-    mainWindow.webContents.send('estimating_air_suspension:get:values', data );
+    mainWindow.webContents.send('estimating_passive_suspension:get:values', data );
     // console.log(data);
 });
 

@@ -14,7 +14,7 @@ const lite_ids = require('./lite_ids');
 const a_star = require('./a_star');
 const siamfc = require('./siamfc');
 const kf_tracking = require('./kf_tracking');
-const kf_air_suspension = require('./kf_air_suspension');
+const kf_passive_suspension = require('./kf_passive_suspension');
 const ekf_localization = require('./ekf_localization');
 const detectron_tracking = require('./detectron_tracking');
 
@@ -53,15 +53,15 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	console.log(addr);
 
-	if(lastPage === 'rls.ejs')						rls.deactivate();
-	else if(lastPage == 'sot.ejs')					sot.deactivate();
-	else if(lastPage === 'detectron_tracking.ejs') 	detectron_tracking.deactivate();
+	if(lastPage === 'rls.ejs')							rls.deactivate();
+	else if(lastPage == 'sot.ejs')						sot.deactivate();
+	else if(lastPage === 'detectron_tracking.ejs') 		detectron_tracking.deactivate();
 	else if(lastPage === 'lite_ids.ejs') { }
-	else if(lastPage === 'a_star.ejs')				a_star.deactivate();
-	else if(lastPage === 'siamfc.ejs') 				siamfc.deactivate();
-	else if(lastPage === 'kf_tracking.ejs')			kf_tracking.deactivate();
-	else if(lastPage === 'kf_air_suspension.ejs')	kf_air_suspension.deactivate();
-	else if(lastPage === 'ekf_localization.ejs')	ekf_localization.deactivate();
+	else if(lastPage === 'a_star.ejs')					a_star.deactivate();
+	else if(lastPage === 'siamfc.ejs') 					siamfc.deactivate();
+	else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
+	else if(lastPage === 'kf_passive_suspension.ejs')	kf_passive_suspension.deactivate();
+	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
 
 
 	if(addr === 'rls.ejs') {
@@ -104,10 +104,10 @@ ipcMain.on("menu:page:change", function(event, addr) {
 		ekf_localization.init(win);
 		win.loadFile('front_end/ekf_localization.ejs');
 
-	} else if(addr === 'kf_air_suspension.ejs') {
+	} else if(addr === 'kf_passive_suspension.ejs') {
 
-		kf_air_suspension.init(win);
-		win.loadFile('front_end/kf_air_suspension.ejs');
+		kf_passive_suspension.init(win);
+		win.loadFile('front_end/kf_passive_suspension.ejs');
 	}
 
 	lastPage = addr;

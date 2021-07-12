@@ -1,4 +1,4 @@
-<%- include('./partial_imports/import_above_content.ejs', { Title: "Estimating AirSuspension with Kalman Filter", PageAddr: 'kf_air_suspension' } ) %>
+<%- include('./partial_imports/import_above_content.ejs', { Title: "Estimating Passive Suspension with Kalman Filter", PageAddr: 'kf_passive_suspension' } ) %>
 
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"   id="btnConnect">Connect</button>
@@ -23,7 +23,7 @@ var linearAlgebra = require('linear-algebra')(),     // Initialise it
                     Matrix = linearAlgebra.Matrix;
 
 var Enum = require('enum');
-const { SuspensionEstimator, DrawHelper, HandleWorkFlow } = require('../classes/cls_kf_air_suspension');
+const { SuspensionEstimator, DrawHelper, HandleWorkFlow } = require('../classes/cls_kf_passive_suspension');
 
 const windowWidth = 900;
 const windowHeight = 600;
@@ -67,7 +67,7 @@ $(document).ready( () => {
 
 } );
 
-ipcRenderer.on('estimating_air_suspension:get:values', (event, values) => {
+ipcRenderer.on('estimating_passive_suspension:get:values', (event, values) => {
 
     values = values.split(';');
 
