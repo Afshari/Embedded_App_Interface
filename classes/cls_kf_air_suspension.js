@@ -22,39 +22,39 @@ class SuspensionEstimator {
 
     constructor() {
 
-        // Model Parameters
-        const ms = 972.2;                  // Sprung mass
-        const mu = 113.6;                  // Unsprung mass
-        const ks = 42719.6;                // Stiffness of the suspension
-        const kt = 101115;                 // Compressibility of the Tyre
-        const cs = 1095;                   // Damping of the suspension
-        const ct = 14.6;                   // Damping of the pneumatic Tyre
+        // // Model Parameters
+        // const ms = 972.2;                  // Sprung mass
+        // const mu = 113.6;                  // Unsprung mass
+        // const ks = 42719.6;                // Stiffness of the suspension
+        // const kt = 101115;                 // Compressibility of the Tyre
+        // const cs = 1095;                   // Damping of the suspension
+        // const ct = 14.6;                   // Damping of the pneumatic Tyre
 
 
-        const A = new Matrix([  [   0,       0,       1,       -1           ],
-                                [   0,       0,       0,        1           ],
-                                [  -ks/ms,   0,       -cs/ms,   cs/ms       ],
-                                [   ks/mu,  -kt/mu,   cs/mu,    -(cs+ct)/mu ] ]);
+        // const A = new Matrix([  [   0,       0,       1,       -1           ],
+        //                         [   0,       0,       0,        1           ],
+        //                         [  -ks/ms,   0,       -cs/ms,   cs/ms       ],
+        //                         [   ks/mu,  -kt/mu,   cs/mu,    -(cs+ct)/mu ] ]);
 
-        const L = Matrix.reshapeFrom( [ 0, -1, 0, ct/mu ], 4, 1 );
+        // const L = Matrix.reshapeFrom( [ 0, -1, 0, ct/mu ], 4, 1 );
         const dt = 0.001;
         this.Tf = 12;
         this.n = this.Tf / dt;
 
-        // Process noise variance
-        const n0 = 0.1;                      // Reference spatial frequency
-        const V  = 25/3.6;                   // Vehicle forward velocity (m/s)
-        const Gqn0 = 16*1e-6;                // Road roughness coefficient
-        const Qc = 4 * Math.PI * Gqn0 * ( n0 ** 2 ) * V;
+        // // Process noise variance
+        // const n0 = 0.1;                      // Reference spatial frequency
+        // const V  = 25/3.6;                   // Vehicle forward velocity (m/s)
+        // const Gqn0 = 16*1e-6;                // Road roughness coefficient
+        // const Qc = 4 * Math.PI * Gqn0 * ( n0 ** 2 ) * V;
         this.F =  new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
                                 [ 1.87325040e-04,  9.99556443e-01,  4.86406564e-06,  9.94923911e-04],
                                 [-4.37024544e-02, -5.05893846e-04,  9.98857916e-01,  1.14184268e-03],
                                 [ 3.73930206e-01, -8.85578620e-01,  9.77200224e-03,  9.89656572e-01] ] );
 
-        this.Q   =  new Matrix([  [  0.0000,    0.0000,   -0.0000,   -0.0000],
-                                  [  0.0000,    0.2233,   -0.0001,   -0.1276],
-                                  [ -0.0000,   -0.0001,    0.0000,    0.0000],
-                                  [ -0.0000,   -0.1276,    0.0000,    0.0875] ] );
+        // this.Q   =  new Matrix([  [  0.0000,    0.0000,   -0.0000,   -0.0000],
+        //                           [  0.0000,    0.2233,   -0.0001,   -0.1276],
+        //                           [ -0.0000,   -0.0001,    0.0000,    0.0000],
+        //                           [ -0.0000,   -0.1276,    0.0000,    0.0875] ] );
         // this.Q = this.Q * 1e-6;
 
         this.H = Matrix.reshapeFrom( [1, 0, 0, 0], 1, 4 );
@@ -68,9 +68,9 @@ class SuspensionEstimator {
         this.Y = Matrix.zero(this.ny, this.n);
 
         // Initial guesses for the state mean and covariance.
-        this.m = new Matrix( [0, 0, 0, 0] );
-        this.C = Matrix.zero( 4 );
-        this.C.data[0][0] = 0.1;
+        // this.m = new Matrix( [0, 0, 0, 0] );
+        // this.C = Matrix.zero( 4 );
+        // this.C.data[0][0] = 0.1;
 
     }
 
@@ -105,7 +105,7 @@ class SuspensionEstimator {
         this.xhat.data[0][i] = value;
     }
 
-    getSuspensionEstimated(i, value) {
+    getSuspensionEstimated(i) {
         return -this.xhat.data[0][i];
     }
 
@@ -193,7 +193,7 @@ class HandleWorkFlow {
     }
 
     handleReset() {
-        
+
     }
 
     handleReceivedValues( values ) {

@@ -52,7 +52,7 @@ function deactivate() {
 var client = new net.Socket();
 
 function connect() {
-    client.connect(5092, '127.0.0.1', function() {
+    client.connect(5091, '127.0.0.1', function() {
         _isConnected = true;
         console.log('Connected');
     });
@@ -75,6 +75,7 @@ ipcMain.on('estimating_air_suspension:send:measurements', (event, data, rnd) => 
         dataStr += data[i];
     }
 
+    dataStr = `101:${dataStr}`
     // console.log(dataStr.length);
     // console.log(dataStr);
     client.write(dataStr)
