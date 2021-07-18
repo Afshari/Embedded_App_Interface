@@ -1,0 +1,113 @@
+<%- include('./partial_imports/import_above_content.ejs', { Title: "H∞ Controller for Active Air Suspension", PageAddr: 'h_inf_air_suspension' } ) %>
+
+<div style="margin: 5px;">
+    <!-- <button type="button" class="btn btn-info"   id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-warning" id="btnPause">Pause</button>
+    <button type="button" class="btn btn-theme" id="btnStep">Step</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button> -->
+    
+
+    <button type="button" class="btn btn-theme" id="btnStartCar">Start Running Car</button>
+    <button type="button" class="btn btn-theme" id="btnReset">Reset</button>
+
+</div>
+
+
+<main>
+</main>
+
+<br /> <br />
+
+<canvas class="webgl" id="threejs_canvas"> 
+</canvas>
+
+
+<%- include('./partial_imports/import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+$(document).ready( () => {
+
+    $("#btnStartCar").click( () => {
+
+        renderHelper.shouldMoveCar = !renderHelper.shouldMoveCar;
+    });
+
+    $("#btnReset").click( () => {
+
+        renderHelper.resetCarPosition();
+    });
+
+} );
+
+
+const THREE = require('three');
+
+require('../ekf_localization/GLTFLoader');
+require('../ekf_localization/OrbitControls');
+require('../ekf_localization/RoomEnvironment');
+
+const { RenderHelper } = require('../classes/cls_h_inf_air_suspension');
+
+// const windowWidth = 900;
+// const windowHeight = 600;
+var time = 0;
+var dt = 0;
+
+const scene = new THREE.Scene();
+
+const axesHelper = new THREE.AxesHelper( 200 );
+
+const loader = new THREE.GLTFLoader();
+
+const canvas = document.querySelector("canvas.webgl");
+
+const textureLoader = new THREE.TextureLoader();
+
+
+
+let renderHelper = new RenderHelper( scene, canvas );
+renderHelper.addLight();
+renderHelper.addFloor();
+renderHelper.addCamera();
+// renderHelper.addOrbitControl();
+renderHelper.addCar();
+renderHelper.addCylinder();
+
+
+// const pmremGenerator = new THREE.PMREMGenerator( renderHelper.renderer );
+// scene.environment = pmremGenerator.fromScene( new THREE.RoomEnvironment(), 0.4 ).texture;
+
+
+var animate = function () {
+
+    requestAnimationFrame(animate);
+
+
+    renderHelper.moveCar();
+    
+    renderHelper.render();
+        
+
+    time += dt;
+
+
+};
+
+animate();
+
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+

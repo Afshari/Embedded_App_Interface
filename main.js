@@ -15,6 +15,7 @@ const a_star = require('./a_star');
 const siamfc = require('./siamfc');
 const kf_tracking = require('./kf_tracking');
 const kf_passive_suspension = require('./kf_passive_suspension');
+const h_inf_air_suspension = require('./h_inf_air_suspension');
 const ekf_localization = require('./ekf_localization');
 const detectron_tracking = require('./detectron_tracking');
 
@@ -42,12 +43,6 @@ function createWindow() {
 
 }
 
-// let port;
-// var inputData = [];
-// var outputData = [];
-// var dataIndex = 0;
-
-// let intervalObj;
 
 ipcMain.on("menu:page:change", function(event, addr) {
 
@@ -61,6 +56,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	else if(lastPage === 'siamfc.ejs') 					siamfc.deactivate();
 	else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
 	else if(lastPage === 'kf_passive_suspension.ejs')	kf_passive_suspension.deactivate();
+	else if(lastPage === 'h_inf_air_suspension.ejs')	h_inf_air_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
 
 
@@ -108,6 +104,12 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 		kf_passive_suspension.init(win);
 		win.loadFile('front_end/kf_passive_suspension.ejs');
+
+	} else if(addr === 'h_inf_air_suspension.ejs') {
+
+		h_inf_air_suspension.init(win);
+		win.loadFile('front_end/h_inf_air_suspension.ejs');
+
 	}
 
 	lastPage = addr;

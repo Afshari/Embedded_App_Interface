@@ -9,7 +9,6 @@ let mainWindow;
 
 module.exports = {
     init,
-    // connect,
     isActive,
     deactivate
 }
@@ -48,40 +47,3 @@ function connect() {
         console.log('Connected');
     });
 }
-
-ipcMain.on('estimating_passive_suspension:connect', (event) => {
-
-    connect();
-})
-
-ipcMain.on('estimating_passive_suspension:send:measurements', (event, data, rnd) => {
-
-    let dataStr = "";
-    // console.log(data.length);
-
-    for(var i = (rnd - 1) * 1000; i < rnd * 1000; i++) {
-
-        if(dataStr !== "")
-            dataStr += ",";
-        dataStr += data[i];
-    }
-
-    dataStr = `101:${dataStr}`
-    // console.log(dataStr.length);
-    // console.log(dataStr);
-    client.write(dataStr)
-})
-
-client.on('data', function(data) {
-
-    data = data.toString();
-    mainWindow.webContents.send('estimating_passive_suspension:get:values', data );
-    // console.log(data);
-});
-
-
-client.on('close', function() {
-	console.log('Connection closed');
-});
-
-
