@@ -46,7 +46,7 @@
         </div>
 
 
-        <div class="row mt">
+        <!-- <div class="row mt">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -67,7 +67,7 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
-        </div>
+        </div> -->
 
 
         </div>
@@ -162,14 +162,32 @@ function getWidthHeightOrient(covar, HH) {
     return { width: width, height: height, orientation: orientation }
 }
 
-
+var measurement = []
 
 $(document).ready( () => {
 
     const { ipcRenderer } = require('electron')
 
     ipcRenderer.on('kf_tracking:result', (event, x, y) => {
-        kfResults.push([x, y])
+
+        if(x == -1 && y == -1) {
+
+            ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+
+        } else {
+
+            kfResults.push([x, y])
+
+            if(state == State.running && stepPointer < points.length - 1) {
+
+                stepPointer += 1;
+                ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+
+            } else {
+                // showFlashMessage('There is not Data for Tracking', 'WARNING');
+            }
+        }
+
     })
 
     $("#btnResetAll").click(function() {
@@ -225,19 +243,11 @@ $(document).ready( () => {
 
             params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
 
-            connection_type = $("#connection_type").val();
-            if(connection_type === "uart") {
-                uart = $("#uart_select").val();
-                ipcRenderer.send('kf_tracking:uart:send:measurements', 100, uart, params)
-                // ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[0]);
-                frameRate(4);
-                state = State.running;
 
-            } else if(connection_type === "tcp") {
-                ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
-                frameRate(4);
-                state = State.running;
-            }
+            ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+            frameRate(4);
+            state = State.running;
+
 
         } else if(state == State.pause || state == State.step) {
             frameRate(4);
@@ -283,19 +293,11 @@ $(document).ready( () => {
 
             params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
 
-            connection_type = $("#connection_type").val();
-            if(connection_type === "uart") {
-                uart = $("#uart_select").val();
-                ipcRenderer.send('kf_tracking:uart:send:measurements', 100, uart, params);
-                // ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[0]);
-                frameRate(4);
-                state = State.step;
 
-            } else if(connection_type === "tcp") {
-                ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
-                frameRate(4);
-                state = State.step;
-            }
+            ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+            frameRate(4);
+            state = State.step;
+
 
         } else if(state == State.step) {
 
@@ -303,37 +305,13 @@ $(document).ready( () => {
 
                 stepPointer += 1;
 
-                if(connection_type === "uart") {
+                ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
 
-                    ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, pathMeasurements[stepPointer]);
-
-                } else if(connection_type === "tcp") {
-
-                    ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
-                }
             } else {
                 showFlashMessage('There is not Data for Tracking', 'WARNING');
             }
         }
     })
-
-
-    // Load UART on Page Load
-    ipcRenderer.send('uart:reload');
-
-        // Load UART on Reload Button Click
-    $("#reloadUart").click( (event) => {
-        // console.log(event)
-        ipcRenderer.send('uart:reload');
-    });
-
-    ipcRenderer.on('uart:data', (event, ports) => {
-        $('#uart_select').find('option').remove();
-        ports.forEach(function(port){
-            $("#uart_select").append(new Option(port['path'], port['path']));
-        });
-    });
-
 
 });
 
@@ -489,19 +467,17 @@ function draw() {
         }
 
         
-        if(state == State.running && stepPointer < points.length - 1) {
-            // console.log(measurement.length)
+        // if(state == State.running && stepPointer < points.length - 1) {
+        //     // console.log(measurement.length)
             
-            if(measurement.length != 0) {
-                if(connection_type === "tcp")
-                    ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, measurement)
-                else if(connection_type === "uart")
-                    ipcRenderer.send('kf_tracking:uart:send:measurements', 101, uart, measurement)
-            }
+        //     if(measurement.length != 0) {
 
-            stepPointer += 1;
-            // state = State.step;
-        }
+        //         ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, measurement)
+        //     }
+
+        //     stepPointer += 1;
+        //     // state = State.step;
+        // }
 
         kfResults.forEach(function(currObj, index, array) {
 
@@ -518,25 +494,6 @@ function draw() {
 
     }    
 
-
-    //     // Draw Estimated Mean
-    //     noStroke()
-    //     fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
-    //     let x = moveX(objToDraw['x']) 
-    //     let y = moveY(objToDraw['y']) 
-    //     circle(x, y, 5)
-
-
-    //     // Draw GroundTruth
-    //     stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-    //     strokeWeight(1.5)
-
-    //     if(index > 0) {
-    //         line(moveX(array[index - 1]['truthX']), moveY(array[index - 1]['truthY']), 
-    //             moveX(objToDraw['truthX']), moveY(objToDraw['truthY']))
-    //     }
-
-    //     circle(moveX(objToDraw['truthX']), moveY(objToDraw['truthY']), 2)
                 
 
     //     // Calculate Covariance

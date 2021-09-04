@@ -23,6 +23,7 @@ class SuspensionEstimator {
     constructor() {
 
         const dt = 0.001;
+        this.ITEM_PER_STEP = 100;
         this.Tf = 12;
         this.n = this.Tf / dt;
 
@@ -118,7 +119,8 @@ class HandleWorkFlow {
         this.ipcRenderer = ipcRenderer;
         this.windowWidth = windowWidth;
         this.counter = windowWidth;
-        this.rnd = 1;
+        // this.rnd = 1;
+        this.rnd = 0;
 
     }
 
@@ -167,16 +169,22 @@ class HandleWorkFlow {
 
     handleReceivedValues( values ) {
 
-        if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
+        console.log(values)
+        // if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
+        if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
 
-            for(var i = 0; i < 1000; i++) {
+            for(var i = 0; i < values.length; i++) {
     
-                this.estimator.setTyreEstimated( ((this.rnd-1)*1000) + i, parseInt( values[i].split(',')[1] ) );
-                this.estimator.setSuspensionEstimated( ((this.rnd-1)*1000) + i, parseInt( values[i].split(',')[0] ) );
+                // this.estimator.setTyreEstimated( ((this.rnd-1)*this.ITEM_PER_STEP) + i, parseInt( values[i].split(',')[1] ) );
+                // this.estimator.setSuspensionEstimated( ((this.rnd-1)*this.ITEM_PER_STEP) + i, parseInt( values[i].split(',')[0] ) );
+                this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
+                this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
             }
-            if(this.rnd < this.estimator.Tf) {
+            // if(this.rnd < this.estimator.Tf) {
+            if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
-                this.rnd += 1;
+                // this.rnd += 1;
+                this.rnd += this.estimator.ITEM_PER_STEP;
                 this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
             } else {
     

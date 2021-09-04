@@ -6,6 +6,7 @@ const net = require('net')
 
 let mainWindow;
 const SERVER_IP = '127.0.0.1';
+// const SERVER_IP = '192.168.1.106';
 const SERVER_PORT = 5091;
 var client = new net.Socket();
 let port;
