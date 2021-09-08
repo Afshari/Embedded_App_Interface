@@ -46,7 +46,7 @@
         </div>
 
 
-        <!-- <div class="row mt">
+        <div class="row mt">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -67,7 +67,7 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
-        </div> -->
+        </div>
 
 
         </div>
@@ -172,7 +172,8 @@ $(document).ready( () => {
 
         if(x == -1 && y == -1) {
 
-            ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+            // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+            sendData(101, pathMeasurements[stepPointer]);
 
         } else {
 
@@ -181,7 +182,8 @@ $(document).ready( () => {
             if(state == State.running && stepPointer < points.length - 1) {
 
                 stepPointer += 1;
-                ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+                // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+                sendData(101, pathMeasurements[stepPointer]);
 
             } else {
                 // showFlashMessage('There is not Data for Tracking', 'WARNING');
@@ -189,6 +191,34 @@ $(document).ready( () => {
         }
 
     })
+
+    ipcRenderer.send('uart:reload');
+
+    // Load UART on Reload Button Click
+    $("#reloadUart").click( (event) => {
+        ipcRenderer.send('uart:reload');
+    });
+    ipcRenderer.on('uart:data', (event, ports) => {
+
+    $('#uart_select').find('option').remove();
+        ports.forEach(function(port){
+            $("#uart_select").append(new Option(port['path'], port['path']));
+        });
+    });
+
+    function sendData(code, params) {
+
+        if(connection_type === "uart") {
+
+            ipcRenderer.send('kf_tracking:uart:send:measurements', uart, code, params);
+
+        } else if(connection_type === "tcp") {
+
+            ipcRenderer.send('kf_tracking:tcp:send:measurements', code, params);
+        }
+
+    }
+
 
     $("#btnResetAll").click(function() {
         eraseAll();
@@ -243,8 +273,12 @@ $(document).ready( () => {
 
             params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
 
+            connection_type = $("#connection_type").val();
+            uart = $("#uart_select").val();
 
-            ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+
+            // ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+            sendData(100, params);
             frameRate(4);
             state = State.running;
 
@@ -293,8 +327,11 @@ $(document).ready( () => {
 
             params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
 
+            connection_type = $("#connection_type").val();
+            uart = $("#uart_select").val();
 
-            ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+            // ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+            sendData(100, params);
             frameRate(4);
             state = State.step;
 
@@ -305,7 +342,8 @@ $(document).ready( () => {
 
                 stepPointer += 1;
 
-                ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+                // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+                sendData(101, pathMeasurements[stepPointer]);
 
             } else {
                 showFlashMessage('There is not Data for Tracking', 'WARNING');
@@ -494,46 +532,6 @@ function draw() {
 
     }    
 
-                
-
-    //     // Calculate Covariance
-    //     var strCovar = objToDraw['covar'].split(',')
-        
-    //     var covar = Matrix.zeros(4, 4);
-    //     for(var i = 0; i < covar.rows; i++) {
-    //         for(var j = 0; j < covar.columns; j++) {
-    //             covar.set(i, j, parseFloat(strCovar[ (i * 4) + j]))
-    //         }
-    //     }
-        
-    //     // Draw Ellipse (Covariance)
-    //     fill(255, 0, 0, 90)
-    //     var uncertainty = getWidthHeightOrient(covar, HH)
-
-    //     push();
-    //         translate(x, y);
-    //         rotate(-uncertainty.orientation)
-    //         noStroke()
-    //         ellipse(0, 0, uncertainty.width*scl, uncertainty.height*scl)
-    //     pop();
-
-    //     var strMeasurements = objToDraw['measurements'].split(':')
-
-    //     if(strMeasurements.length > 2) {
-
-    //         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-    //         for(var i = 1; i < strMeasurements.length; i+=3) {
-    //             var state = strMeasurements[i + 2].split(',')
-
-    //             let measX = moveX(state[0])
-    //             let measY = moveY(state[1])
-
-    //             noStroke()
-    //             circle(measX, measY, measurementCircleRadius)
-    //         }
-    //     }
-    // })
-
 }
 
 function eraseAll() {
@@ -550,7 +548,8 @@ function addMeasurementToPath() {
 
     pathMeasurements = []
     points.forEach(function(p, index, array) {
-        pathMeasurements.push( [ parseInt( p[0] + random(-10, 10) ), parseInt( p[1] + random(-10, 10) ) ] )
+        pathMeasurements.push( [ parseInt( p[0] + random(-30, 30) ), parseInt( p[1] + random(-30, 30) ) ] )
+        // pathMeasurements.push( [ parseInt( p[0] + random(-10, 10) ), parseInt( p[1] + random(-10, 10) ) ] )
     })
 }
 

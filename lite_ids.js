@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
-const contextMenu = require('electron-context-menu');
 const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
