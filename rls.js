@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
 
 const SerialPort = require('serialport');
+const  ByteLength = require('@serialport/parser-byte-length');
 
 var linearAlgebra = require('linear-algebra')(),     // initialise it
 					Vector = linearAlgebra.Vector,
@@ -14,6 +15,8 @@ var _isConnected = false;
 let port;
 let intervalObj;
 
+const UART_DATA_LENGTH = 300;
+const UART_RECV_LENGTH = 30;
 
 module.exports = {
 	init,
@@ -43,7 +46,7 @@ function sendCommandUart(code, measurement) {
 
     let strData = `${code}:${measurement}`;
     strData = `${strData.length}:${strData}`;
-    for(var i = strData.length; i < 54; i++) {
+    for(var i = strData.length; i < UART_DATA_LENGTH; i++) {
         strData += "_";
     }
 
@@ -82,51 +85,49 @@ function prepareData() {
 	k += 1;
 }
 
+let finished = false;
 ipcMain.on('rls:ready:receive', (event, uart) => {
 
 	if ( typeof port === 'undefined' ) {
 
 		port = new SerialPort(uart, { baudRate: 115200 });
+		const parser = port.pipe( new ByteLength( { length: UART_RECV_LENGTH } ) );
 
+		finished = false;
 		port.on('error', function(err) {
 			console.log('Error: ', err.message);
 		});
 
-		var wholeData = "";
-		port.on('data', function(data){
+		parser.on('data', function(data){
 
 			let currData = data.toString();
+			console.log("currData ", currData);
 
             if( currData.indexOf("corrupted") !== -1 ) {
 
-                wholeData = "";
                 mainWindow.webContents.send('rls:x:data', -1, -1);
                 
-            } else if( currData.indexOf('\r\n') !== -1 ) {
-        
-                wholeData += currData;
-                wholeData = wholeData.toString().split(',');
-                // console.log(data)
-                var x = parseFloat( wholeData[0] )
-                var y = parseFloat( wholeData[1] )
-				console.log(x, y)
-                wholeData = "";
-                
-                // mainWindow.webContents.send('rls:x:data', x, y);
-				event.reply('rls:x:data', [x, y]);
+            } else {
 
-				if(k < 280) {
+			    currData = currData.replace(/_/g,"");
+                currData = currData.split(',');
+                // console.log(data)
+                var x = parseFloat( currData[0] )
+                var y = parseFloat( currData[1] )
+				console.log(k, x, y)
+                
+                if(Number.isNaN(x) == false && Number.isNaN(y) == false)
+					event.reply('rls:x:data', [x, y]);
+
+				if(x === 10 && y === 5) {
+					console.log("Finished");
+					finished = true;
+				} else if(finished == false && k < 280) {
 					prepareData();
 				}
 
-            } else {
+			}
 
-                wholeData += currData;
-            }
-
-			// console.log("Received Data: ", data.toString());
-			// let result = data.toString().split(" ");
-			// event.reply('rls:x:data', [result[0], result[1]]);
 		});
 
 		prepareData();

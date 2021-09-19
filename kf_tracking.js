@@ -4,6 +4,7 @@ const ejse = require('ejs-electron');
 
 const  net = require('net');
 const  SerialPort = require('serialport');
+const  ByteLength = require('@serialport/parser-byte-length');
 
 
 let mainWindow
@@ -18,6 +19,8 @@ const SERVER_IP = '192.168.1.15';
 const SERVER_PORT = 5555;
 var client = new net.Socket();
 
+const UART_DATA_LENGTH = 300;
+const UART_RECV_LENGTH = 30;
 
 module.exports = {
     init,
@@ -86,42 +89,37 @@ ipcMain.on('kf_tracking:uart:send:measurements', (event, uart, code, measurement
     if ( typeof port === 'undefined' ) {
 
         port = new SerialPort(uart, { baudRate: 115200 });
+        const parser = port.pipe( new ByteLength( { length: UART_RECV_LENGTH } ) );
 
         port.on('error', function(err) {
             console.log('Error: ', err.message);
         });
 
-        var wholeData = "";
-        port.on('data', function(data) {
+        parser.on('data', function(data) {
 
             let currData = data.toString();
+            console.log(currData);
 
             if( currData.indexOf("corrupted") !== -1 ) {
 
-                wholeData = "";
                 mainWindow.webContents.send('kf_tracking:result', -1, -1);
                 
-            } else if( currData.indexOf('\r\n') !== -1 ) {
+            } else  {
         
-                wholeData += currData;
-                wholeData = wholeData.toString().split(',');
-                // console.log(data)
-                var x = parseInt( wholeData[0] )
-                var y = parseInt( wholeData[1] )
-                wholeData = "";
+                currData = currData.replace(/_/g,"");
+                currData = currData.split(',');
+                var x = parseInt( currData[0] )
+                var y = parseInt( currData[1] )
                 
                 mainWindow.webContents.send('kf_tracking:result', x, y);
 
-            } else {
-
-                wholeData += currData;
-            }
+            } 
         });
     }
 
     let strData = `${code}:${measurement}`;
     strData = `${strData.length}:${strData}`;
-    for(var i = strData.length; i < 54; i++) {
+    for(var i = strData.length; i < UART_DATA_LENGTH; i++) {
         strData += "_";
     }
     console.log(strData);

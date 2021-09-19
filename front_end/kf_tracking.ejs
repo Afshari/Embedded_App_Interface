@@ -200,7 +200,7 @@ $(document).ready( () => {
     });
     ipcRenderer.on('uart:data', (event, ports) => {
 
-    $('#uart_select').find('option').remove();
+        $('#uart_select').find('option').remove();
         ports.forEach(function(port){
             $("#uart_select").append(new Option(port['path'], port['path']));
         });

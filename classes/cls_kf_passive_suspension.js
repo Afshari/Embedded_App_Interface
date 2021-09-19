@@ -23,8 +23,9 @@ class SuspensionEstimator {
     constructor() {
 
         const dt = 0.001;
-        this.ITEM_PER_STEP = 100;
-        this.Tf = 12;
+        this.ITEM_PER_STEP = 50;
+        // this.Tf = 12;
+        this.Tf = 3;
         this.n = this.Tf / dt;
 
         this.F =  new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
@@ -79,6 +80,10 @@ class SuspensionEstimator {
         return -this.xhat.data[0][i];
     }
 
+    getSuspensionMeasurement(i) {
+        return -this.Y.data[0][i] * SuspensionEstimator.scl;
+    }
+
     static replaceMatrixColumn(arr, val, idx) {
 
         arr.data[0][idx] = val[0];
@@ -93,7 +98,8 @@ class SuspensionEstimator {
 
         let t_x = H.dot( n_x ).data;
 
-        Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.01 ) ) * SuspensionEstimator.scl );
+        // Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.01 ) ) * SuspensionEstimator.scl );
+        Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.04 ) ) * SuspensionEstimator.scl );
     }
 
     static genData(F, x, idx) {
@@ -121,6 +127,8 @@ class HandleWorkFlow {
         this.counter = windowWidth;
         // this.rnd = 1;
         this.rnd = 0;
+        this.connection_type = "";
+        this.uart = "";
 
     }
 
@@ -149,12 +157,18 @@ class HandleWorkFlow {
         }
     }
 
-    handleRun( ) {
+    handleRun( c_type, c_uart ) {
 
         if( this.isStateReady() ) {
 
             this.state2SendingMeasurements();
-            this.ipcRenderer.send('estimating_passive_suspension:send:measurements', estimator.Y.data[0], this.rnd);
+            this.connection_type = c_type;
+            this.uart = c_uart;
+
+            if(this.connection_type === "tcp")
+                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd);
+            else if(this.connection_type === "uart")
+                this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
 
         } else if( this.isStatePause() ) {
 
@@ -170,22 +184,34 @@ class HandleWorkFlow {
     handleReceivedValues( values ) {
 
         console.log(values)
+        // console.log("rnd ", this.rnd)
+        // console.log(this.isStateSendingMeasurements())
         // if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
         if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
 
-            for(var i = 0; i < values.length; i++) {
-    
-                // this.estimator.setTyreEstimated( ((this.rnd-1)*this.ITEM_PER_STEP) + i, parseInt( values[i].split(',')[1] ) );
-                // this.estimator.setSuspensionEstimated( ((this.rnd-1)*this.ITEM_PER_STEP) + i, parseInt( values[i].split(',')[0] ) );
-                this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
-                this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
+            for(var i = 0; i < values.length; i++) {    
+                if(this.connection_type === "tcp") {
+                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
+                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
+                } else if(this.connection_type === "uart") {
+                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i] ) );
+                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i] ) );
+                }
             }
-            // if(this.rnd < this.estimator.Tf) {
+            
+            console.log("rnd ", this.rnd)
             if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
-                // this.rnd += 1;
-                this.rnd += this.estimator.ITEM_PER_STEP;
-                this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
+                if(this.connection_type === "tcp") {
+                    this.rnd += this.estimator.ITEM_PER_STEP;
+                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd);
+                } else if(this.connection_type === "uart") {
+                    this.rnd += this.estimator.ITEM_PER_STEP;
+                    this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
+                }
+
+
+                // this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
             } else {
     
                 this.state2Running();

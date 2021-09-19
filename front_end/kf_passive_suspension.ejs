@@ -1,5 +1,39 @@
 <%- include('./partial_imports/import_above_content.ejs', { Title: "Estimating Passive Suspension with Kalman Filter", PageAddr: 'kf_passive_suspension' } ) %>
 
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Connection Configuration </h4>
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="connection_type" style="padding-left: 0px;">
+                        <option value="uart">UART</option>
+                        <option value="tcp">TCP/IP</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <select class="form-control" id="uart_select" style="padding-left: 0px;">
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
+            </div>
+        </div>
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"   id="btnConnect">Connect</button>
     <button type="button" class="btn btn-warning" id="btnPause">Pause</button>
@@ -35,10 +69,25 @@ estimator.init();
 const drawHelper = new DrawHelper( estimator, windowWidth );
 
 var handleWorkFlow = new HandleWorkFlow( estimator, ipcRenderer, windowWidth );
-console.log( handleWorkFlow );
+// console.log( handleWorkFlow );
 
 
 $(document).ready( () => {
+
+    ipcRenderer.send('uart:reload');
+
+    // Load UART on Reload Button Click
+    $("#reloadUart").click( (event) => {
+        ipcRenderer.send('uart:reload');
+    });
+    ipcRenderer.on('uart:data', (event, ports) => {
+
+        $('#uart_select').find('option').remove();
+        ports.forEach(function(port){
+            $("#uart_select").append(new Option(port['path'], port['path']));
+        });
+    });
+
 
     $("#btnConnect").click( () => {
 
@@ -62,7 +111,7 @@ $(document).ready( () => {
 
     $("#btnRun").click( () => {
 
-        handleWorkFlow.handleRun();        
+        handleWorkFlow.handleRun($("#connection_type").val(), $("#uart_select").val());
     });
 
 } );
@@ -131,7 +180,11 @@ function draw() {
             stroke(255, 0, 0);
             if(i <= handleWorkFlow.counter - halfWidth) {
                 point(i - firstValue, estimator.getSuspensionEstimated(i) + drawHelper.suspensionOffset() );
-                point(i - firstValue, estimator.getTyreEstimated(i));  
+                if(handleWorkFlow.connection_type === "tcp")
+                    point(i - firstValue, estimator.getTyreEstimated(i));
+
+                // stroke(0, 0, 255);
+                // point(i - firstValue, estimator.getSuspensionMeasurement(i) + drawHelper.suspensionOffset() );
             }
             
             stroke(0);
