@@ -17,6 +17,7 @@ const kf_tracking = require('./kf_tracking');
 const kf_passive_suspension = require('./kf_passive_suspension');
 const h_inf_air_suspension = require('./h_inf_air_suspension');
 const ekf_localization = require('./ekf_localization');
+const pf_localization  = require('./pf_localization');
 const detectron_tracking = require('./detectron_tracking');
 
 
@@ -58,6 +59,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	else if(lastPage === 'kf_passive_suspension.ejs')	kf_passive_suspension.deactivate();
 	else if(lastPage === 'h_inf_air_suspension.ejs')	h_inf_air_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
+	else if(lastPage === 'pf_localization.ejs')			pf_localization.deactivate();
 
 
 	if(addr === 'rls.ejs') {
@@ -99,6 +101,11 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 		ekf_localization.init(win);
 		win.loadFile('front_end/ekf_localization.ejs');
+
+	} else if(addr === 'pf_localization.ejs') {
+
+		pf_localization.init(win);
+		win.loadFile('front_end/pf_localization.ejs');
 
 	} else if(addr === 'kf_passive_suspension.ejs') {
 
