@@ -7,6 +7,15 @@
 
         <div class="row mt">
             <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Simulation Time</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="time_id" value="12">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt">
+            <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
                     <select class="form-control" id="connection_type" style="padding-left: 0px;">
@@ -17,7 +26,25 @@
             </div>
         </div>
 
-        <div class="row mt">
+        <div class="row mt" id="ip_div_id" style="display: none;">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt" id="port_div_id" style="display: none;">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt" id="uart_div_id">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -65,7 +92,7 @@ const halfWidth = windowWidth / 2;
 
 
 var estimator = new SuspensionEstimator();
-estimator.init();
+// estimator.init();
 const drawHelper = new DrawHelper( estimator, windowWidth );
 
 var handleWorkFlow = new HandleWorkFlow( estimator, ipcRenderer, windowWidth );
@@ -75,6 +102,18 @@ var handleWorkFlow = new HandleWorkFlow( estimator, ipcRenderer, windowWidth );
 $(document).ready( () => {
 
     ipcRenderer.send('uart:reload');
+
+    $('#connection_type').on('change', function() {
+        if( $("#connection_type").val() == "uart" ) {
+            $('#ip_div_id').hide();
+            $('#port_div_id').hide();
+            $('#uart_div_id').show();
+        } else if( $("#connection_type").val() == "tcp" ) {
+            $('#ip_div_id').show();
+            $('#port_div_id').show();
+            $('#uart_div_id').hide();
+        }
+    });
 
     // Load UART on Reload Button Click
     $("#reloadUart").click( (event) => {
@@ -91,7 +130,7 @@ $(document).ready( () => {
 
     $("#btnConnect").click( () => {
 
-        handleWorkFlow.handleConnect();
+        handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });
 
     $("#btnPause").click( () => {
@@ -111,7 +150,7 @@ $(document).ready( () => {
 
     $("#btnRun").click( () => {
 
-        handleWorkFlow.handleRun($("#connection_type").val(), $("#uart_select").val());
+        handleWorkFlow.handleRun( $("#connection_type").val(), $("#uart_select").val(), $("#time_id").val() );
     });
 
 } );

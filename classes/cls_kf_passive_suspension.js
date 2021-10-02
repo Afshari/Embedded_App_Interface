@@ -22,10 +22,15 @@ class SuspensionEstimator {
 
     constructor() {
 
+        this.init( 12 )
+    }
+
+    init( tm ) {
+
         const dt = 0.001;
         this.ITEM_PER_STEP = 50;
-        // this.Tf = 12;
-        this.Tf = 3;
+        this.Tf = tm;
+        // this.Tf = 3;
         this.n = this.Tf / dt;
 
         this.F =  new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
@@ -42,10 +47,6 @@ class SuspensionEstimator {
         this.x = Matrix.zero(this.nx, this.n);
         this.xhat = Matrix.zero(this.nx, this.n);
         this.Y = Matrix.zero(this.ny, this.n);
-
-    }
-
-    init() {
 
         SuspensionEstimator.replaceMatrixColumn(this.x, [0.1, 0, 0, 0], 0);
 
@@ -132,8 +133,8 @@ class HandleWorkFlow {
 
     }
 
-    handleConnect() {
-        this.ipcRenderer.send('estimating_passive_suspension:connect');
+    handleConnect(ip, port) {
+        this.ipcRenderer.send('estimating_passive_suspension:connect', ip, port);
     }
 
     handleStep() {
@@ -157,16 +158,17 @@ class HandleWorkFlow {
         }
     }
 
-    handleRun( c_type, c_uart ) {
+    handleRun( c_type, c_uart, tm ) {
 
         if( this.isStateReady() ) {
 
             this.state2SendingMeasurements();
             this.connection_type = c_type;
             this.uart = c_uart;
+            this.estimator.init( parseInt(tm) )
 
             if(this.connection_type === "tcp")
-                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd);
+                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
             else if(this.connection_type === "uart")
                 this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
 
@@ -204,7 +206,7 @@ class HandleWorkFlow {
 
                 if(this.connection_type === "tcp") {
                     this.rnd += this.estimator.ITEM_PER_STEP;
-                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd);
+                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
                 } else if(this.connection_type === "uart") {
                     this.rnd += this.estimator.ITEM_PER_STEP;
                     this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );

@@ -57,9 +57,10 @@ function deactivate() {
 
 var client = new net.Socket();
 
-function connect() {
+function connect(ip, port) {
 
-    client.connect(SERVER_PORT, SERVER_IP, function() {
+    console.log(ip, port);
+    client.connect(port, ip, function() {
         _isConnected = true;
         console.log('Connected');
     });
@@ -82,9 +83,9 @@ ipcMain.on('ekf_localization:tcp:send:measurements', (event, u, observations) =>
     }
 })
 
-ipcMain.on('ekf_localization:tcp:connect', (event) => {
+ipcMain.on('ekf_localization:tcp:connect', (event, ip, port) => {
 
-    connect();
+    connect(ip, port);
 });
 
 

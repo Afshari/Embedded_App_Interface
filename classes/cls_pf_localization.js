@@ -8,6 +8,26 @@ require('../ekf_localization/Detector');
 require('../ekf_localization/stats.min');
 
 
+class Particle {
+
+    constructor( x, y, theta ) {
+
+        this.x = x;
+        this.y = y;
+        this.theta = theta;
+    }
+}
+
+class Robot {
+
+    constructor( x, y, theta ) {
+
+        this.x = x;
+        this.y = y;
+        this.theta = theta;
+    }
+}
+
 class RenderHelper {
 
     constructor( scene, canvas ) {
@@ -23,12 +43,6 @@ class RenderHelper {
 
         this.cameraOffset = 22;
 
-        if(this.enableGUI) {
-            this.addGUI();
-
-            this.gui.add(this, 'cameraOffset').min(0).max(30).step(0.1).name('Camera Offset');
-        }
-
         this.loader = new THREE.GLTFLoader();
         this.clock = new THREE.Clock();
         this.car = null;
@@ -38,19 +52,16 @@ class RenderHelper {
         this.initRenderer();
         this.initTextures();
         this.initScene();
-        // this.addCar();
+        this.addCar();
         this.addWall();
-        // this.addPoles();
+        this.addPoles();
 
         this.addLight();
         this.addFloor();
         this.addCamera();
         this.addOrbitControl();
 
-
         this.initPhysicsGraphics();
-        this.initPhysics();
-        this.addBoxes();
 
         this.actions = {};
         this.keysActions = {
@@ -60,141 +71,6 @@ class RenderHelper {
             "KeyD": 'right'
         };
     
-
-        var quaternion = new THREE.Quaternion(0, 0, 0, 1);
-        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-        
-        // this.createVehicle(new THREE.Vector3(0, 5, 0), quaternion);
-    
-
-        this.pmremGenerator = new THREE.PMREMGenerator( this.renderer );
-        this.scene.environment = this.pmremGenerator.fromScene( new THREE.RoomEnvironment(), 0.4 ).texture;
-
-    }
-
-    initPhysicsGraphics() {
-
-        this.materialDynamic = new THREE.MeshPhongMaterial( { color: 0xfca400 } );
-        this.materialStatic = new THREE.MeshPhongMaterial( { color: 0x999999 } );
-        this.materialInteractive =new THREE.MeshPhongMaterial( { color: 0x990000 } );
-
-        this.materialDynamic.wireframe = true;
-        this.materialStatic.wireframe = true;
-        this.materialInteractive.wireframe = true;
-
-        this.materialDynamic.visible = true;
-        this.materialStatic.visible = true;
-        this.materialInteractive.visible = true;
-
-        let that = this;
-        window.addEventListener( 'keydown', function(e) {
-            if(that.keysActions[e.code]) {
-                that.actions[that.keysActions[e.code]] = false;
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }    
-        });
-        window.addEventListener( 'keyup', function(e) {
-            if(that.keysActions[e.code]) {
-                that.actions[that.keysActions[e.code]] = true;
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }    
-        }); 
-    }
-
-    initPhysics() {
-
-        let that = this;
-        // Physics configuration
-        Ammo().then(function(Ammo) {
-
-            that.collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
-            that.dispatcher = new Ammo.btCollisionDispatcher( that.collisionConfiguration );
-            that.broadphase = new Ammo.btDbvtBroadphase();
-            that.solver = new Ammo.btSequentialImpulseConstraintSolver();
-            that.physicsWorld = new Ammo.btDiscreteDynamicsWorld( that.dispatcher, that.broadphase, that.solver, that.collisionConfiguration );
-            that.physicsWorld.setGravity( new Ammo.btVector3( 0, -9.82, 0 ) );
-
-            // - Global variables -
-            that.TRANSFORM_AUX = new Ammo.btTransform();
-
-        });
-
-        this.DISABLE_DEACTIVATION = 4;
-        this.ZERO_QUATERNION = new THREE.Quaternion(0, 0, 0, 1);
-        this.syncList = [];
-    }
-
-    createBox(pos, quat, w, l, h, mass, friction) {
-
-        let that = this;
-        Ammo().then(function(Ammo) {
-
-            var material = mass > 0 ? that.materialDynamic : that.materialStatic;
-            var shape = new THREE.BoxGeometry(w, l, h, 1, 1, 1);
-            var geometry = new Ammo.btBoxShape(new Ammo.btVector3(w * 0.5, l * 0.5, h * 0.5));
-
-            if(!mass) mass = 0;
-            if(!friction) friction = 1;
-
-            var mesh = new THREE.Mesh(shape, material);
-            mesh.position.copy(pos);
-            mesh.quaternion.copy(quat);
-            that.scene.add( mesh );
-
-            var transform = new Ammo.btTransform();
-            transform.setIdentity();
-            transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
-            transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
-            var motionState = new Ammo.btDefaultMotionState(transform);
-
-            var localInertia = new Ammo.btVector3(0, 0, 0);
-            geometry.calculateLocalInertia(mass, localInertia);
-
-            var rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, geometry, localInertia);
-            var body = new Ammo.btRigidBody(rbInfo);
-
-            body.setFriction(friction);
-            //body.setRestitution(.9);
-            //body.setDamping(0.2, 0.2);
-
-            that.physicsWorld.addRigidBody( body );
-
-            if (mass > 0) {
-                body.setActivationState(that.DISABLE_DEACTIVATION);
-                // Sync physics and graphics
-                function sync(dt) {
-                    var ms = body.getMotionState();
-                    if (ms) {
-                        ms.getWorldTransform(TRANSFORM_AUX);
-                        var p = TRANSFORM_AUX.getOrigin();
-                        var q = TRANSFORM_AUX.getRotation();
-                        mesh.position.set(p.x(), p.y(), p.z());
-                        mesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
-                    }
-                }
-
-                that.syncList.push(sync);
-            }
-        });
-    }
-
-    addBoxes() {
-
-        this.createBox(new THREE.Vector3(0, -0.5, 0), this.ZERO_QUATERNION, 550, 5, 550, 0, 2);
-
-        this.createBox(new THREE.Vector3(100, 7, 70), this.ZERO_QUATERNION, 10, 10, 30, 0, 0);
-        this.createBox(new THREE.Vector3(-140, 5, -80), this.ZERO_QUATERNION, 10, 10, 60, 0, 0);
-        this.createBox(new THREE.Vector3(-50, 3, 200), this.ZERO_QUATERNION, 80, 5, 5, 0, 0);
-        this.createBox(new THREE.Vector3(90, 7, -90), this.ZERO_QUATERNION, 20, 20, 20, 0, 0);
-
-        this.createBox(new THREE.Vector3(260, 5, 5), this.ZERO_QUATERNION, 10, 15, 500, 0, 0);
-        this.createBox(new THREE.Vector3(-260, 5, 5), this.ZERO_QUATERNION, 10, 15, 500, 0, 0);
-        this.createBox(new THREE.Vector3(5, 5, -260), this.ZERO_QUATERNION, 500, 15, 10, 0, 0);
-        this.createBox(new THREE.Vector3(5, 5, 260), this.ZERO_QUATERNION, 500, 15, 10, 0, 0);
     }
 
     createChassisMesh(w, l, h) {
@@ -213,225 +89,27 @@ class RenderHelper {
         return mesh;
     }
 
+    initPhysicsGraphics() {
 
-    createVehicle(pos, quat) {
+        this.materialDynamic = new THREE.MeshPhongMaterial( { color:0xfca400 } );
+        this.materialStatic = new THREE.MeshPhongMaterial( { color:0x999999 } );
+        this.materialInteractive =new THREE.MeshPhongMaterial( { color:0x990000 } );
 
-        let that = this;
-        Ammo().then(function(Ammo) {
+        this.materialDynamic.wireframe = true;
+        this.materialStatic.wireframe = true;
+        this.materialInteractive.wireframe = true;
 
-            var chassisWidth = 16;
-            var chassisHeight = 2.5;
-            var chassisLength = 40;
-            var massVehicle = 800;
+        this.materialDynamic.visible = false;
+        this.materialStatic.visible = false;
+        this.materialInteractive.visible = false;
 
-            var wheelAxisPositionBack = -12;
-            var wheelHalfTrackBack = 8;
-            var wheelAxisHeightBack = -1;
-            var wheelRadiusBack = 2;
-            var wheelWidthBack = 1;
-
-            var wheelAxisFrontPosition = 12;
-            var wheelHalfTrackFront = 8;
-            var wheelAxisHeightFront = -1;
-            var wheelRadiusFront = 2;
-            var wheelWidthFront = 1;
-
-            var friction = 100;
-            var suspensionStiffness = 20.0;
-            var suspensionDamping = 2.3;
-            var suspensionCompression = 4.4;
-            var suspensionRestLength = 0.6;
-            // var rollInfluence = 0.2;
-            var rollInfluence = 0.1;
-
-            var steeringIncrement = .04;
-            var steeringClamp = .5;
-            var maxEngineForce = 700;
-            var maxBreakingForce = 100;
-
-
-            // Chassis
-            var geometry = new Ammo.btBoxShape(new Ammo.btVector3(chassisWidth * .5, chassisHeight * .5, chassisLength * .5));
-            var transform = new Ammo.btTransform();
-            transform.setIdentity();
-            transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
-            transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
-            var motionState = new Ammo.btDefaultMotionState(transform);
-            var localInertia = new Ammo.btVector3(0, 0, 0);
-            geometry.calculateLocalInertia(massVehicle, localInertia);
-            var body = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(massVehicle, motionState, geometry, localInertia));
-            body.setActivationState(that.DISABLE_DEACTIVATION);
-            that.physicsWorld.addRigidBody(body);
-            var chassisMesh = that.createChassisMesh(chassisWidth, chassisHeight, chassisLength);
-
-            // Raycast Vehicle
-            var engineForce = 0;
-            var vehicleSteering = 0;
-            var breakingForce = 0;
-            var tuning = new Ammo.btVehicleTuning();
-            var rayCaster = new Ammo.btDefaultVehicleRaycaster(that.physicsWorld);
-            that.vehicle = new Ammo.btRaycastVehicle(tuning, body, rayCaster);
-            // window.vehicle = vehicle;
-            that.vehicle.setCoordinateSystem(0, 1, 2);
-            // that.physicsWorld.addAction(vehicle);
-
-            // Wheels
-            var FRONT_LEFT = 0;
-            var FRONT_RIGHT = 1;
-            var BACK_LEFT = 2;
-            var BACK_RIGHT = 3;
-            var wheelMeshes = [];
-            var wheelDirectionCS0 = new Ammo.btVector3(0, -1, 0);
-            var wheelAxleCS = new Ammo.btVector3(-1, 0, 0);
-
-            function addWheel(isFront, pos, radius, width, index) {
-
-                var wheelInfo = that.vehicle.addWheel(
-                        pos,
-                        wheelDirectionCS0,
-                        wheelAxleCS,
-                        suspensionRestLength,
-                        radius,
-                        tuning,
-                        isFront);
-
-                wheelInfo.set_m_suspensionStiffness(suspensionStiffness);
-                wheelInfo.set_m_wheelsDampingRelaxation(suspensionDamping);
-                wheelInfo.set_m_wheelsDampingCompression(suspensionCompression);
-                wheelInfo.set_m_frictionSlip(friction);
-                wheelInfo.set_m_rollInfluence(rollInfluence);
-
-                wheelMeshes[index] = that.createWheelMesh(radius, width);
-            }
-
-
-            addWheel(true, new Ammo.btVector3(wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_LEFT);
-            addWheel(true, new Ammo.btVector3(-wheelHalfTrackFront, wheelAxisHeightFront, wheelAxisFrontPosition), wheelRadiusFront, wheelWidthFront, FRONT_RIGHT);
-            addWheel(false, new Ammo.btVector3(-wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_LEFT);
-            addWheel(false, new Ammo.btVector3(wheelHalfTrackBack, wheelAxisHeightBack, wheelAxisPositionBack), wheelRadiusBack, wheelWidthBack, BACK_RIGHT);
-
-            window.wheels = wheelMeshes;
-            var lastCoeff = 0;
-
-            // Sync keybord actions and physics and graphics
-            function sync(dt) {
-
-                var speed = that.vehicle.getCurrentSpeedKmHour();
-                // console.log(speed);
-
-                // speedometer.innerHTML = (speed < 0 ? '(R) ' : '') + Math.abs(speed).toFixed(1) + ' km/h';
-
-                breakingForce = 0;
-                engineForce = 0;
-
-                if (that.actions.acceleration) {
-                    if (speed < -1)
-                        breakingForce = maxBreakingForce;
-                    else engineForce = maxEngineForce;
-                }
-                if (that.actions.braking) {
-                    if (speed > 1)
-                        breakingForce = maxBreakingForce;
-                    else engineForce = -maxEngineForce / 2;
-                }
-                if (that.actions.left) {
-                    if (vehicleSteering < steeringClamp)
-                        vehicleSteering += steeringIncrement;
-                }
-                else {
-                    if (that.actions.right) {
-                        if (vehicleSteering > -steeringClamp)
-                            vehicleSteering -= steeringIncrement;
-                    }
-                    else {
-                        if (vehicleSteering < -steeringIncrement)
-                            vehicleSteering += steeringIncrement;
-                        else {
-                            if (vehicleSteering > steeringIncrement)
-                                vehicleSteering -= steeringIncrement;
-                            else {
-                                vehicleSteering = 0;
-                            }
-                        }
-                    }
-                }
-
-
-                // if(speed > 900) 
-                    // engineForce = 0;
-
-                console.log(engineForce, vehicleSteering)
-
-                that.vehicle.applyEngineForce(engineForce, BACK_LEFT);
-                that.vehicle.applyEngineForce(engineForce, BACK_RIGHT);
-
-                that.vehicle.setBrake(breakingForce / 2, FRONT_LEFT);
-                that.vehicle.setBrake(breakingForce / 2, FRONT_RIGHT);
-                that.vehicle.setBrake(breakingForce, BACK_LEFT);
-                that.vehicle.setBrake(breakingForce, BACK_RIGHT);
-
-                that.vehicle.setSteeringValue(vehicleSteering, FRONT_LEFT);
-                that.vehicle.setSteeringValue(vehicleSteering, FRONT_RIGHT);
-
-
-                let pre_fr_y = wheelMeshes[0].rotation.y;
-
-                var tm, p, q, i;
-                var n = that.vehicle.getNumWheels();
-                for (i = 0; i < n; i++) {
-                    that.vehicle.updateWheelTransform(i, true);
-                    tm = that.vehicle.getWheelTransformWS(i);
-                    p = tm.getOrigin();
-                    q = tm.getRotation();
-                    wheelMeshes[i].position.set(p.x(), p.y(), p.z());
-                    wheelMeshes[i].quaternion.set(q.x(), q.y(), q.z(), q.w());
-                    
-
-                    if(that.tyres.length == 0)
-                        continue;
-
-
-                    if(i < 2) {
-                        if(vehicleSteering > 0)
-                            that.tyres[i].rotation.z = Math.PI / 6;
-                        else if(vehicleSteering < 0)
-                            that.tyres[i].rotation.z = -Math.PI / 6;
-                        else
-                            that.tyres[i].rotation.z = 0;
-                    }
-
-
-                    if(Math.abs(speed) < 1.2)
-                        continue;
-
-                    var sclRotation = 0.02 * ( (speed / 15) + 1 );
-                    if(engineForce > 0) {
-                        that.tyres[i].rotation.x += sclRotation;
-                        lastCoeff = 1;
-                    } else if(engineForce < 0) {
-                        that.tyres[i].rotation.x -= sclRotation;
-                        lastCoeff = -1;
-                    } else {
-                        that.tyres[i].rotation.x += lastCoeff * sclRotation;
-                    }
-                    // tyres[i].rotation.y = Math.PI / 6;
-                }
-
-                tm = that.vehicle.getChassisWorldTransform();
-                p = tm.getOrigin();
-                q = tm.getRotation();
-                chassisMesh.position.set(p.x(), p.y(), p.z());
-                chassisMesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
-            }
-
-            that.syncList.push(sync);
-        });
     }
+
 
     initTextures() {
 
         this.textureLoader = new THREE.TextureLoader();
-        this.groundTexture = textureLoader.load( '../ekf_localization/textures/granite_seamless_gravel.jpg' );
+        this.groundTexture = this.textureLoader.load( '../ekf_localization/textures/granite_seamless_gravel.jpg' );
 
         this.groundTexture.wrapS = this.groundTexture.wrapT = THREE.RepeatWrapping;
         this.groundTexture.repeat.set( 200, 200 );
@@ -515,6 +193,12 @@ class RenderHelper {
         light.shadow.camera.far = 1000;
         
         this.scene.add( light );
+
+        var quaternion = new THREE.Quaternion(0, 0, 0, 1);
+        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+        
+        this.pmremGenerator = new THREE.PMREMGenerator( this.renderer );
+        this.scene.environment = this.pmremGenerator.fromScene( new THREE.RoomEnvironment(), 0.4 ).texture;
     }
 
     addCamera() {
@@ -565,10 +249,10 @@ class RenderHelper {
             that.tyre_bl.rotation.order = 'YZX';
             that.tyre_br.rotation.order = 'YZX';
     
-            that.tyres.push(tyre_fr)
-            that.tyres.push(tyre_fl)
-            that.tyres.push(tyre_bl)
-            that.tyres.push(tyre_br)
+            that.tyres.push(that.tyre_fr)
+            that.tyres.push(that.tyre_fl)
+            that.tyres.push(that.tyre_bl)
+            that.tyres.push(that.tyre_br)
     
             that.scene.add(that.car);
         
@@ -699,64 +383,11 @@ class RenderHelper {
     
     }
 
-    render() {
-
-        let that = this;
-
-        Ammo().then(function(Ammo) {
-
-            // requestAnimationFrame(animate);
-            var quaternion = new THREE.Quaternion(0, 0, 0, 1);
-            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    
-            that.createVehicle(new THREE.Vector3(0, 5, 0), quaternion);
-            that.physicsWorld.addAction(that.vehicle);
-
-            // var dt = that.clock.getDelta();
-            // for (var i = 0; i < this.syncList.length; i++)
-            //     this.syncList[i](dt);
-
-            // that.physicsWorld.stepSimulation( dt, 10 );
-            // that.controls.update( dt );
-
-            // let vPos = that.vehicle.getChassisWorldTransform().getOrigin();
-            // let vRot = that.vehicle.getChassisWorldTransform().getRotation();
-            // chassisMesh.quaternion.set(q.x(), q.y(), q.z(), q.w());
-            // if(that.car !== null) {
-            //     that.car.position.set(vPos.x(), vPos.y()-5, vPos.z());
-            //     that.car.quaternion.set(vRot.x(), vRot.y(), vRot.z(), vRot.w());
-            // }
-
-            // that.renderer.render( that.scene, that.camera );
-            // that.time += dt;
-
-            var animate = function () {
-
-                requestAnimationFrame(animate);
-
-                var dt = that.clock.getDelta();
-
-                for (var i = 0; i < that.syncList.length; i++)
-                    that.syncList[i](dt);
-
-                if( typeof(that.physicsWorld) != "undefined" ) {
-                    // console.log('not that.physicsWorld ', that.physicsWorld)
-                    that.physicsWorld.stepSimulation( dt, 10 );
-                } else
-                    console.log('that.physicsWorld ', that.physicsWorld)
-                    
-                that.renderer.render( that.scene, that.camera );
-                time += dt;
-            };
-
-            animate();
-        });
-            
-    }
-
 }
 
 
 module.exports = {
     RenderHelper,
+    Particle,
+    Robot
 }

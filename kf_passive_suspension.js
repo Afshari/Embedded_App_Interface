@@ -49,22 +49,23 @@ function deactivate() {
 
 var client = new net.Socket();
 
-function connect() {
-    client.connect(SERVER_PORT, SERVER_IP, function() {
+function connect(ip, port) {
+    // client.connect(SERVER_PORT, SERVER_IP, function() {
+    client.connect(port, ip, function() {
         _isConnected = true;
         console.log('Connected');
     });
 }
 
-ipcMain.on('estimating_passive_suspension:connect', (event) => {
+ipcMain.on('estimating_passive_suspension:connect', (event, ip, port) => {
 
-    connect();
+    connect(ip, port);
 })
 
-ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, data, rnd) => {
+ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, data, rnd, ITEM_PER_STEP) => {
 
     let dataStr = "";
-    const ITEM_PER_STEP = 50;
+    // const ITEM_PER_STEP = 50;
 
     for(var i = rnd; i < rnd + ITEM_PER_STEP; i++) {
 
@@ -91,6 +92,7 @@ client.on('data', function(data) {
 
 
 client.on('close', function() {
+    _isConnected = false;
 	console.log('Connection closed');
 });
 
