@@ -8,23 +8,34 @@
     
 
     <button type="button" class="btn btn-theme" id="btnStartCar">Start Running Car</button>
-    <button type="button" class="btn btn-theme" id="btnReset">Reset</button>
+    <button type="button" class="btn btn-theme" id="btnCarReset">Car Reset</button>
 
 </div>
 
 
-<main>
-</main>
-
-<br /> <br />
-
 <canvas class="webgl" id="threejs_canvas"> 
 </canvas>
 
+<br /> <br />
+<button type="button" class="btn btn-theme" id="btnRequest">Request</button>
+<button type="button" class="btn btn-theme" id="btnPause">Pause</button>
+<button type="button" class="btn btn-theme" id="btnReset">Reset</button>
+<br /> <br />
+
+<main>
+</main>
 
 <%- include('./partial_imports/import_below_content.ejs') %>
 
 <script type="text/javascript">
+
+var fileIndex = 0;
+var fileNames = [ 'x1', 'xp1', 'x2', 'xp2', 'zr', 'zrdot' ];
+
+const { Matrix } = require('ml-matrix');
+
+// var A = new Matrix([[1, 1], [2, 2]]);
+// console.log('A ', A.data)
 
 $(document).ready( () => {
 
@@ -33,12 +44,26 @@ $(document).ready( () => {
         renderHelper.shouldMoveCar = !renderHelper.shouldMoveCar;
     });
 
-    $("#btnReset").click( () => {
-
+    $("#btnCarReset").click( () => {
         renderHelper.resetCarPosition();
+    });
+    $("#btnReset").click( () => {
+        counter = windowWidth;
+    });
+    $("#btnRequest").click( () => {
+        requestData();    
+    });
+    $("#btnPause").click( () => {
+        isReadyToDraw = !isReadyToDraw;
     });
 
 } );
+
+function requestData() {
+
+    ipcRenderer.send('suspension_controller:request:read', fileNames[fileIndex]);
+    fileIndex += 1;
+}
 
 
 const THREE = require('three');
@@ -47,21 +72,26 @@ require('../ekf_localization/GLTFLoader');
 require('../ekf_localization/OrbitControls');
 require('../ekf_localization/RoomEnvironment');
 
-const { RenderHelper } = require('../classes/cls_h_inf_air_suspension');
+const { RenderHelper, SuspensionController, DrawHelper } = require('../classes/cls_h_inf_air_suspension');
 
-// const windowWidth = 900;
-// const windowHeight = 600;
+
+const windowWidth   = 900;
+const windowHeight  = 600;
+const halfWidth     = windowWidth / 2;
+
+var   controller = new SuspensionController();
+const drawHelper = new DrawHelper( controller, windowWidth );
+
+var counter = windowWidth;
+var isReadyToDraw = false;
+
 var time = 0;
 var dt = 0;
 
 const scene = new THREE.Scene();
-
 const axesHelper = new THREE.AxesHelper( 200 );
-
 const loader = new THREE.GLTFLoader();
-
 const canvas = document.querySelector("canvas.webgl");
-
 const textureLoader = new THREE.TextureLoader();
 
 
@@ -83,19 +113,125 @@ var animate = function () {
 
     requestAnimationFrame(animate);
 
-
     renderHelper.moveCar();
-    
     renderHelper.render();
-        
-
     time += dt;
-
-
 };
 
 animate();
 
+ipcRenderer.on('suspension_controller:draw', (event, data) => {
+
+    data = data.split(',');
+
+    if(fileIndex == 1) {
+        controller.activeSuspension = data;
+    } else if(fileIndex == 2) {
+        controller.passiveSuspension = data;
+    } else if(fileIndex == 3) {
+        controller.activeTyre = data;
+    } else if(fileIndex == 4) {
+        controller.passiveTyre = data;
+        // isReadyToDraw = true;
+        // controller.addStarterValues(windowWidth)
+    } else if(fileIndex == 5) {
+        controller.zrFile = data;
+    } else if(fileIndex == 6) {
+        controller.zrdotFile = data;
+        isReadyToDraw = true;
+        controller.addStarterValues(windowWidth)
+    }
+
+    if(fileIndex < 6) {
+        requestData();
+    }
+});
+
+function drawLegends() {
+
+    translate(0, 0);
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Active', 40, 30)
+    text('Passive', 40, 50)
+
+    stroke(0, 0, 255);
+    strokeWeight(1.5)
+    line(10, 30, 30, 30);
+
+    stroke(255, 0, 0);
+    strokeWeight(1.5)
+    line(10, 50, 30, 50);
+}
+
+
+function drawBackground() {
+
+    rectMode(CORNER);
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, windowWidth, windowHeight);
+
+}
+
+function setup() {
+        
+    createCanvas(windowWidth, windowHeight);
+    
+    drawBackground();
+    drawLegends();
+    
+    // frameRate(5);
+    // console.log("Setup Running...")
+    // noLoop();
+}
+
+function draw() {
+
+    if(isReadyToDraw == true) {
+
+        drawBackground();
+        drawLegends();
+
+        translate(0, 3*height/4);
+        var firstValue = counter - windowWidth;
+        for(var i = counter - windowWidth; i < counter; i++) {
+                        
+            stroke(255, 0, 0);
+            point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
+            point(i - firstValue, controller.getPassiveTyre(i));
+
+            stroke(0, 255, 0);
+            point(i - firstValue, controller.getPassiveSuspensionFile(i) + drawHelper.suspensionOffset() + 5 );
+            point(i - firstValue, controller.getPassiveTyreFile(i) + 5);
+
+            // stroke(0, 0, 255);
+            // point(i - firstValue, controller.getActiveSuspension(i) + drawHelper.suspensionOffset() );
+            // point(i - firstValue, controller.getActiveTyre(i));
+        }
+
+        // controller.drawZr( counter, windowWidth );
+        // controller.drawZrdot( counter, windowWidth );
+
+        // drawHelper.drawPassive( counter );
+        // drawHelper.drawActive( counter );
+
+        if( counter < controller.passiveTyre.length - 15 )
+            counter += 15;
+        else {
+            noLoop();
+        }
+
+
+    }
+    
+
+}
 
 </script>
 

@@ -47,3 +47,25 @@ function connect() {
         console.log('Connected');
     });
 }
+
+
+
+function readFile(filepath) {
+
+    fs.readFile(filepath, 'utf-8', (err, data) => {
+        if(err){
+            console.log("An error ocurred reading the file :" + err.message);
+            return;
+        }
+    
+        mainWindow.webContents.send('suspension_controller:draw', data.toString() );
+        // console.log("The file content is : " + data);
+    });
+}
+
+
+ipcMain.on('suspension_controller:request:read', (event, filename) => {
+
+    const filepath = `suspension/data/${filename}.txt`;
+    readFile( filepath );
+})
