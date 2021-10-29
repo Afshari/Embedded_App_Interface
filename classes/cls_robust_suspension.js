@@ -3,6 +3,16 @@ const THREE = require('three');
 const { Matrix } = require('ml-matrix');
 
 
+var Enum = require('enum');
+
+var State = new Enum( { 
+    'ready': 1,
+    'sendingMeasurements': 2,
+    'running': 3,
+    'pause': 4,
+    'finish': 5
+})
+
 class RenderHelper {
 
     constructor( scene, canvas ) {
@@ -318,22 +328,18 @@ class RenderHelper {
 
 class HandleWorkFlow {
 
-    constructor( estimator, ipcRenderer, windowWidth ) {
+    constructor( controller, ipcRenderer, windowWidth ) {
 
-        this.state = State.ready;
-        this.estimator = estimator;
-        this.ipcRenderer = ipcRenderer;
-        this.windowWidth = windowWidth;
-        this.counter = windowWidth;
-        // this.rnd = 1;
-        this.rnd = 0;
-        this.connection_type = "";
-        this.uart = "";
-
+        this.state              =   State.ready;
+        this.controller         =   controller;
+        this.ipcRenderer        =   ipcRenderer;
+        this.windowWidth        =   windowWidth;
+        this.counter            =   windowWidth;
+        this.rnd                =   0;
     }
 
     handleConnect(ip, port) {
-        this.ipcRenderer.send('estimating_passive_suspension:connect', ip, port);
+        this.ipcRenderer.send('robust_suspension:connect', ip, port);
     }
 
     handleStep() {
@@ -357,19 +363,17 @@ class HandleWorkFlow {
         }
     }
 
-    handleRun( c_type, c_uart, tm ) {
+    handleRun( ) {
 
         if( this.isStateReady() ) {
 
             this.state2SendingMeasurements();
-            this.connection_type = c_type;
-            this.uart = c_uart;
-            this.estimator.init( parseInt(tm) )
+            // this.connection_type = c_type;
+            // this.uart = c_uart;
+            // this.estimator.init( )
 
-            if(this.connection_type === "tcp")
-                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-            else if(this.connection_type === "uart")
-                this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
+            this.ipcRenderer.send('robust_suspension:tcp:send:state', 
+                this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
         } else if( this.isStatePause() ) {
 
@@ -384,32 +388,27 @@ class HandleWorkFlow {
 
     handleReceivedValues( values ) {
 
+        values = values.split(',')
         console.log(values)
         // console.log("rnd ", this.rnd)
         // console.log(this.isStateSendingMeasurements())
         // if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
-        if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
+        if(this.rnd <= (this.controller.nt - 1)) { // && this.isStateSendingMeasurements() ) {
 
-            for(var i = 0; i < values.length; i++) {    
-                if(this.connection_type === "tcp") {
-                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
-                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
-                } else if(this.connection_type === "uart") {
-                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i] ) );
-                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i] ) );
-                }
+            for(var i = 0; i < values.length; i += 2) {    
+                
+                // this.controller.setPassiveSuspension( this.rnd + (i/2), parseFloat( values[i] ) );
+                // this.controller.setPassiveTyre( this.rnd + (i/2), parseFloat( values[i+1] ) );
+                this.controller.setActiveSuspension( this.rnd + (i/2), parseFloat( values[i] ) );
+                this.controller.setActiveTyre( this.rnd + (i/2), parseFloat( values[i+1] ) );
             }
             
             console.log("rnd ", this.rnd)
-            if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
+            if(this.rnd < this.controller.nt - this.controller.ITEM_PER_STEP - 1) {
 
-                if(this.connection_type === "tcp") {
-                    this.rnd += this.estimator.ITEM_PER_STEP;
-                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-                } else if(this.connection_type === "uart") {
-                    this.rnd += this.estimator.ITEM_PER_STEP;
-                    this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-                }
+                this.rnd += this.controller.ITEM_PER_STEP;
+                this.ipcRenderer.send('robust_suspension:tcp:send:state', 
+                    this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
 
                 // this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
@@ -489,6 +488,8 @@ class SuspensionController {
 
         this.generateBumpRoad();
 
+        this.K = new Matrix( [ [ -90156, 23219, -34989, 1148.4 ] ] );
+
         this.ms     =   Matrix.ones(1, this.nt).mul( 572.2 );
         this.x1r    =   Matrix.ones(1, this.nt).mul( 0.01 );
         this.xr     =   new Matrix( [ [1], [-3.9559*1e-6], [0], [0] ] ).mmul(this.x1r);
@@ -511,10 +512,52 @@ class SuspensionController {
         this.beta   =   42;                     // positive weighting for tire deflection
 
         this.D = new Matrix( [ [ 0, -1, 0, this.ct/this.mu ] ] ).transpose()
-        
         this.w = new Matrix( [ this.zrdot ] );
 
+        this.generatePassive();
+        // this.xp_suspension   =   []
+        // this.xp_tyre         =   []
 
+        // this.generateActive();
+        // for(var i = 0; i < 500; i++) {
+        //     console.log('i ', this.w.get(0, i), 'x', this.x.data[0][i], this.x.data[1][i], this.x.data[2][i], this.x.data[3][i])
+        // }
+        this.x_suspension      = []
+        this.x_tyre            = []
+
+        this.ITEM_PER_STEP = 50;
+    }
+
+    generatePassive() {
+
+        for(var i = 0; i < this.nt; i++) {
+
+            this.A = new Matrix( [  
+                [ 0,                            0,                      1,                           -1 ],
+                [ 0,                            0,                      0,                            1 ],
+                [-this.ks/this.ms.get(0, i),    0,                      -this.cs/this.ms.get(0, i),   this.cs/this.ms.get(0, i) ],
+                [this.ks/this.mu,               -this.kt/this.mu,        this.cs/this.mu,           -(this.cs+this.ct)/this.mu] ]);
+
+
+            // xp(:, i + 1) = xp(:,i) + ( A * xp(:,i) + D * w(i) ) * dt
+            var curr_xp = new Matrix( [ this.xp.data.map(function(value, index) { return value[i]; }) ] ).transpose();
+            var tmp_xp = Matrix.add( curr_xp, Matrix.add( this.A.mmul( curr_xp ), Matrix.mul( this.D, this.w.get(0, i) ) ).mul( this.dt ) );
+            for(var j = 0; j < tmp_xp.rows; j++) {
+                this.xp.set(j, i+1, tmp_xp.get(j, 0))
+            }
+
+            // zp(:,i) = C1 * xp(:,i);
+            var tmp_zp = this.C1 * curr_xp;
+            for(var j = 0; j < tmp_zp.rows; j++) {
+                this.zp.set(j, i, tmp_zp.get(j, 0))
+            }
+        }
+
+        this.xp_suspension      = Object.values( this.xp.data[0] )
+        this.xp_tyre            = Object.values( this.xp.data[1] )
+    }
+
+    generateActive() {
         for(var i = 0; i < this.nt; i++) {
 
             this.A = new Matrix( [  
@@ -532,63 +575,41 @@ class SuspensionController {
 
             this.D12 = new Matrix( [ [1/this.ms.get(0, i)], [0], [0] ] );
 
-            // xp(:, i + 1) = xp(:,i) + ( A * xp(:,i) + D * w(i) ) * dt
-            // var col3 = two_d.map(function(value,index) { return value[2]; });
-            var curr_xp = new Matrix( [ this.xp.data.map(function(value, index) { return value[i]; }) ] ).transpose();
-            var tmp_xp = Matrix.add( curr_xp, Matrix.add( this.A.mmul( curr_xp ), Matrix.mul( this.D, this.w.get(0, i) ) ).mul( this.dt ) );
-            for(var j = 0; j < tmp_xp.rows; j++) {
-                this.xp.set(j, i+1, tmp_xp.get(j, 0))
+
+            // u(i) = ur(i) + K * (x(:,i) - xr(:,i));
+            var curr_x  = new Matrix( [ this.x.data.map(function(value, index) { return value[i]; }) ] ).transpose();
+            var curr_xr = new Matrix( [ this.xr.data.map(function(value, index) { return value[i]; }) ] ).transpose();
+            this.u.set(0, i, Matrix.add( this.K.mmul( Matrix.sub( curr_x, curr_xr ) ), this.ur.get(0, i) ).get(0, 0) );
+            
+            
+            // x(:,i+1) = x(:,i) + ( A * x(:,i) + B * u(i) + D * w(i) ) * dt ;
+            var tmp_x = Matrix.add( Matrix.add( this.A.mmul(curr_x), Matrix.mul( this.B, this.u.get(0, i) ) ), Matrix.mul( this.D, this.w.get(0, i) ) ).mul( this.dt );
+            tmp_x = Matrix.add( curr_x, tmp_x )
+            for(var j = 0; j < tmp_x.rows; j++) {
+                this.x.set(j, i+1, tmp_x.get(j, 0))
             }
         }
 
-        // console.log('xp ', this.xp);
-        console.log('ms ', this.ms.get(0, 0))
-        console.log('A ', this.A)
-        this.xp_suspension      = Object.values( this.xp.data[0] )
-        this.xp_tyre            = Object.values( this.xp.data[1] )
-
-        // const dt = 0.001;
-        // this.ITEM_PER_STEP = 50;
-        // this.Tf = tm;
-        // // this.Tf = 3;
-        // this.n = this.Tf / dt;
-
-        // this.F =  new Matrix( [ [ 9.99790784e-01,  4.43388313e-04,  9.94567510e-04, -9.94355552e-04],
-        //                         [ 1.87325040e-04,  9.99556443e-01,  4.86406564e-06,  9.94923911e-04],
-        //                         [-4.37024544e-02, -5.05893846e-04,  9.98857916e-01,  1.14184268e-03],
-        //                         [ 3.73930206e-01, -8.85578620e-01,  9.77200224e-03,  9.89656572e-01] ] );
-
-        // this.H = Matrix.reshapeFrom( [1, 0, 0, 0], 1, 4 );
-        // this.R = new Matrix( [ (1e-3)**2 ] );
-
-        // this.nx = this.F.rows;
-        // this.ny = this.H.rows;
-
-        // this.x = Matrix.zero(this.nx, this.n);
-        // this.xhat = Matrix.zero(this.nx, this.n);
-        // this.Y = Matrix.zero(this.ny, this.n);
-
-        // SuspensionEstimator.replaceMatrixColumn(this.x, [0.1, 0, 0, 0], 0);
-
-        // for(var i = 0; i < this.n - 1; i++)
-        //     SuspensionEstimator.genData(this.F, this.x, i);
-            
-        // for(i = 0; i < this.n; i++)
-        //     SuspensionEstimator.setMeasurement(this.H, this.x, this.Y, i);
+        this.x_suspension      = Object.values( this.x.data[0] )
+        this.x_tyre            = Object.values( this.x.data[1] )
     }
 
     // Active Tyre
     setActiveTyre(i, value) {        
-        // this.xhat.data[1][i] = value;
+        // this.x_tyre[i] = value;
+        this.x_tyre.push(value)
     }
     getActiveTyre(i) {
-        // return -this.xhat.data[1][i];
+        return this.x_tyre[i] * this.meter2Pixel;
+    }
+    getActiveTyreFile(i) {
         return this.activeTyre[i] * this.meter2Pixel;
     }
 
     // Passive Tyre
     setPassiveTyre(i, value) {        
-        // this.xhat.data[1][i] = value;
+        // this.xp_tyre[i] = value;
+        this.xp_tyre.push(value)
     }
     getPassiveTyre(i) {
         return this.xp_tyre[i] * this.meter2Pixel;
@@ -599,16 +620,20 @@ class SuspensionController {
 
     // Active Suspension
     setActiveSuspension(i, value) {        
-        // this.xhat.data[0][i] = value;
+        // this.x_suspension[i] = value;
+        this.x_suspension.push(value);
     }
     getActiveSuspension(i) {
-        // return -this.x.data[0][i] * SuspensionEstimator.scl;
+        return this.x_suspension[i] * this.meter2Pixel;
+    }
+    getActiveSuspensionFile(i) {
         return this.activeSuspension[i] * this.meter2Pixel;
     }
 
     // Passive Suspension
     setPassiveSuspension(i, value) {        
-        // this.xhat.data[0][i] = value;
+        // this.xp_suspension[i] = value;
+        this.xp_suspension.push(value)
     }
     getPassiveSuspension(i) {
         return this.xp_suspension[i] * this.meter2Pixel;
@@ -650,6 +675,8 @@ class SuspensionController {
         
         this.xp_suspension = zeroArray.concat(this.xp_suspension)
         this.xp_tyre = zeroArray.concat(this.xp_tyre)
+        this.x_suspension = zeroArray.concat(this.x_suspension)
+        this.x_tyre = zeroArray.concat(this.x_tyre)
     }
 
     generateBumpRoad() {
@@ -703,39 +730,6 @@ class SuspensionController {
             window.point(i - firstValue, this.getZr(i) - 100);
         }
 
-    }
-
-    getSuspensionMeasurement(i) {
-        // return -this.Y.data[0][i] * SuspensionEstimator.scl;
-    }
-
-    static replaceMatrixColumn(arr, val, idx) {
-
-        // arr.data[0][idx] = val[0];
-        // arr.data[1][idx] = val[1];
-        // arr.data[2][idx] = val[2];
-        // arr.data[3][idx] = val[3];
-    }
-
-    static setMeasurement(H, x, Y, idx) {
-
-        // let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
-
-        // let t_x = H.dot( n_x ).data;
-
-        // Y.data[0][idx] = parseInt( ( t_x[0][0] + ( (Math.random()-0.5) * 0.04 ) ) * SuspensionEstimator.scl );
-    }
-
-    static genData(F, x, idx) {
-
-        // let n_x = Matrix.reshapeFrom( [ x.data[0][idx], x.data[1][idx], x.data[2][idx], x.data[3][idx] ], 4, 1 );
-
-        // let t_x = F.dot( n_x ).data;
-
-        // x.data[0][idx+1] = t_x[0][0] + ( (Math.random()-0.5) * 0.005 );
-        // x.data[1][idx+1] = t_x[1][0] + ( (Math.random()-0.5) * 0.005 );
-        // x.data[2][idx+1] = t_x[2][0] + ( (Math.random()-0.5) * 0.005 );
-        // x.data[3][idx+1] = t_x[3][0] + ( (Math.random()-0.5) * 0.005 );
     }
 }
 

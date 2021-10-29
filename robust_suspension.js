@@ -2,6 +2,7 @@ const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
 const  fs = require('fs')
 const net = require('net')
+const { Matrix } = require('ml-matrix');
 
 
 let mainWindow;
@@ -41,14 +42,39 @@ function deactivate() {
 
 var client = new net.Socket();
 
-function connect() {
-    client.connect(5091, '127.0.0.1', function() {
+function connect(ip, port) {
+    client.connect(port, ip, function() {
         _isConnected = true;
         console.log('Connected');
     });
 }
 
+ipcMain.on('robust_suspension:connect', (event, ip, port) => {
 
+    connect(ip, port);
+})
+
+
+
+ipcMain.on('robust_suspension:tcp:send:state', (event, w, ms, rnd, ITEM_PER_STEP) => {
+
+    let dataStr = "";
+
+    w = new Matrix( w.data );
+    ms = new Matrix( ms.data );
+    for(var i = rnd; i < rnd + ITEM_PER_STEP; i++) {
+
+        if(dataStr !== "")
+            dataStr += ",";
+        dataStr += `${w.get(0, i).toFixed(4)},${ms.get(0, i).toFixed(1)}`
+    }
+
+    // dataStr = `101:${dataStr}`
+    dataStr = `102:${dataStr}`
+    dataStr = `S${dataStr.length}:${dataStr}E`
+    // console.log('Data Length: ', dataStr.length)
+    client.write(dataStr)
+})
 
 function readFile(filepath) {
 
@@ -58,13 +84,19 @@ function readFile(filepath) {
             return;
         }
     
-        mainWindow.webContents.send('suspension_controller:draw', data.toString() );
+        mainWindow.webContents.send('robust_suspension:draw', data.toString() );
         // console.log("The file content is : " + data);
     });
 }
 
 
-ipcMain.on('suspension_controller:request:read', (event, filename) => {
+client.on('data', function(data) {
+
+    data = data.toString();
+    mainWindow.webContents.send('robust_suspension:get:values', data );
+});
+
+ipcMain.on('robust_suspension:request:read', (event, filename) => {
 
     const filepath = `suspension/data/${filename}.txt`;
     readFile( filepath );

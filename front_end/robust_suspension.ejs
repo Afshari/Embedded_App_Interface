@@ -1,0 +1,235 @@
+<%- include('./partial_imports/import_above_content.ejs', { Title: "Robust Suspension", PageAddr: 'robust_suspension' } ) %>
+
+
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Connection Configuration </h4>
+
+        <div class="row mt" id="ip_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt" id="port_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                </div>
+            </div>
+        </div>
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-theme"     id="btnRequest">Request</button>
+    <button type="button" class="btn btn-theme"     id="btnPause">Pause</button>
+    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+    <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
+</div>
+<br /> <br />
+
+<main>
+</main>
+
+<%- include('./partial_imports/import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+var fileIndex = 0;
+var fileNames = [ 'x1', 'xp1', 'x2', 'xp2', 'zr', 'zrdot' ];
+
+const { Matrix } = require('ml-matrix');
+
+const { RenderHelper, SuspensionController, DrawHelper, HandleWorkFlow } = require('../classes/cls_robust_suspension');
+
+const windowWidth   = 900;
+const windowHeight  = 600;
+const halfWidth     = windowWidth / 2;
+
+var   controller = new SuspensionController();
+const drawHelper = new DrawHelper( controller, windowWidth );
+
+var handleWorkFlow = new HandleWorkFlow( controller, ipcRenderer, windowWidth );
+
+$(document).ready( () => {
+
+    $("#btnConnect").click( () => {
+        handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
+    });
+    $("#btnReset").click( () => {
+        counter = windowWidth;
+    });
+    $("#btnRequest").click( () => {
+        requestData();    
+    });
+    $("#btnPause").click( () => {
+        isReadyToDraw = !isReadyToDraw;
+    });
+    $("#btnRun").click( () => {
+
+        handleWorkFlow.handleRun( );
+    });
+
+} );
+
+function requestData() {
+
+    ipcRenderer.send('robust_suspension:request:read', fileNames[fileIndex]);
+    fileIndex += 1;
+}
+
+
+var counter = windowWidth;
+var isReadyToDraw = false;
+
+var time = 0;
+var dt = 0;
+
+ipcRenderer.on('robust_suspension:get:values', (event, values) => {
+
+    handleWorkFlow.handleReceivedValues( values );
+})
+
+
+ipcRenderer.on('robust_suspension:draw', (event, data) => {
+
+    data = data.split(',');
+
+    if(fileIndex == 1) {
+        controller.activeSuspension = data;
+    } else if(fileIndex == 2) {
+        controller.passiveSuspension = data;
+    } else if(fileIndex == 3) {
+        controller.activeTyre = data;
+    } else if(fileIndex == 4) {
+        controller.passiveTyre = data;
+    } else if(fileIndex == 5) {
+        controller.zrFile = data;
+    } else if(fileIndex == 6) {
+        controller.zrdotFile = data;
+        isReadyToDraw = true;
+        controller.addStarterValues(windowWidth)
+    }
+
+    if(fileIndex < 6) {
+        requestData();
+    }
+});
+
+function drawLegends() {
+
+    translate(0, 0);
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Active', 40, 30)
+    text('Passive', 40, 50)
+
+    stroke(0, 0, 255);
+    strokeWeight(1.5)
+    line(10, 30, 30, 30);
+
+    stroke(255, 0, 0);
+    strokeWeight(1.5)
+    line(10, 50, 30, 50);
+}
+
+
+function drawBackground() {
+
+    rectMode(CORNER);
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, windowWidth, windowHeight);
+
+}
+
+function setup() {
+        
+    createCanvas(windowWidth, windowHeight);
+    
+    drawBackground();
+    drawLegends();
+    
+    // frameRate(5);
+    // console.log("Setup Running...")
+    // noLoop();
+}
+
+function draw() {
+
+    if(isReadyToDraw == true) {
+
+        drawBackground();
+        drawLegends();
+
+        translate(0, 3*height/4);
+        var firstValue = counter - windowWidth;
+        for(var i = counter - windowWidth; i < counter; i++) {
+                        
+
+            stroke(255, 0, 0);
+            point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
+            point(i - firstValue, controller.getPassiveTyre(i));
+
+            // stroke(0, 255, 0);
+            // point(i - firstValue, controller.getPassiveSuspensionFile(i) + drawHelper.suspensionOffset() + 5 );
+            // point(i - firstValue, controller.getPassiveTyreFile(i) + 5);
+
+
+            stroke(0, 0, 255);
+            point(i - firstValue, controller.getActiveSuspension(i) + drawHelper.suspensionOffset() );
+            point(i - firstValue, controller.getActiveTyre(i));
+
+            // stroke(0, 255, 0);
+            // point(i - firstValue, controller.getActiveSuspensionFile(i) + drawHelper.suspensionOffset() + 5);
+            // point(i - firstValue, controller.getActiveTyreFile(i) + 5);
+        }
+
+        // controller.drawZr( counter, windowWidth );
+        // controller.drawZrdot( counter, windowWidth );
+
+        drawHelper.drawPassive( counter );
+        drawHelper.drawActive( counter );
+
+        if( counter < controller.passiveTyre.length - 15 )
+            counter += 15;
+        else {
+            noLoop();
+        }
+
+
+    }
+    
+
+}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
