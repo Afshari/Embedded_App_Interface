@@ -56,7 +56,7 @@ ipcMain.on('robust_suspension:connect', (event, ip, port) => {
 
 
 
-ipcMain.on('robust_suspension:tcp:send:state', (event, w, ms, rnd, ITEM_PER_STEP) => {
+ipcMain.on('robust_suspension:tcp:send:state', (event, code, w, ms, rnd, ITEM_PER_STEP) => {
 
     let dataStr = "";
 
@@ -70,7 +70,7 @@ ipcMain.on('robust_suspension:tcp:send:state', (event, w, ms, rnd, ITEM_PER_STEP
     }
 
     // dataStr = `101:${dataStr}`
-    dataStr = `102:${dataStr}`
+    dataStr = `${code}:${dataStr}`
     dataStr = `S${dataStr.length}:${dataStr}E`
     // console.log('Data Length: ', dataStr.length)
     client.write(dataStr)
@@ -93,11 +93,12 @@ function readFile(filepath) {
 client.on('data', function(data) {
 
     data = data.toString();
+    console.log(data.length)
     mainWindow.webContents.send('robust_suspension:get:values', data );
 });
 
-ipcMain.on('robust_suspension:request:read', (event, filename) => {
+// ipcMain.on('robust_suspension:request:read', (event, filename) => {
 
-    const filepath = `suspension/data/${filename}.txt`;
-    readFile( filepath );
-})
+//     const filepath = `suspension/data/${filename}.txt`;
+//     readFile( filepath );
+// })

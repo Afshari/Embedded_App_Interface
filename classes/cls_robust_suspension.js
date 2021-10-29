@@ -372,7 +372,7 @@ class HandleWorkFlow {
             // this.uart = c_uart;
             // this.estimator.init( )
 
-            this.ipcRenderer.send('robust_suspension:tcp:send:state', 
+            this.ipcRenderer.send('robust_suspension:tcp:send:state', 101,
                 this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
         } else if( this.isStatePause() ) {
@@ -389,10 +389,6 @@ class HandleWorkFlow {
     handleReceivedValues( values ) {
 
         values = values.split(',')
-        console.log(values)
-        // console.log("rnd ", this.rnd)
-        // console.log(this.isStateSendingMeasurements())
-        // if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
         if(this.rnd <= (this.controller.nt - 1)) { // && this.isStateSendingMeasurements() ) {
 
             for(var i = 0; i < values.length; i += 2) {    
@@ -403,15 +399,13 @@ class HandleWorkFlow {
                 this.controller.setActiveTyre( this.rnd + (i/2), parseFloat( values[i+1] ) );
             }
             
-            console.log("rnd ", this.rnd)
+            // console.log("rnd ", this.rnd)
             if(this.rnd < this.controller.nt - this.controller.ITEM_PER_STEP - 1) {
 
                 this.rnd += this.controller.ITEM_PER_STEP;
-                this.ipcRenderer.send('robust_suspension:tcp:send:state', 
+                this.ipcRenderer.send('robust_suspension:tcp:send:state', 102,
                     this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
-
-                // this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
             } else {
     
                 this.state2Running();
@@ -469,6 +463,7 @@ class SuspensionController {
         this.tf = 20;
         this.t  = []
         this.nt = this.tf / this.dt;
+        console.log('nt ', this.nt)
         var tmp_t = 0;
         for(var i = 0; i <= this.nt; i++) {
             this.t.push( tmp_t );
@@ -520,12 +515,16 @@ class SuspensionController {
 
         // this.generateActive();
         // for(var i = 0; i < 500; i++) {
-        //     console.log('i ', this.w.get(0, i), 'x', this.x.data[0][i], this.x.data[1][i], this.x.data[2][i], this.x.data[3][i])
+        //     console.log(i, this.w.get(0, i), 'x', this.x.data[0][i], this.x.data[1][i], this.x.data[2][i], this.x.data[3][i])
         // }
         this.x_suspension      = []
         this.x_tyre            = []
 
         this.ITEM_PER_STEP = 50;
+    }
+
+    isDataReady() {
+        return (this.x_suspension.length >= this.nt - 1) && (this.xp_suspension.length >= this.nt - 1)
     }
 
     generatePassive() {
@@ -602,9 +601,9 @@ class SuspensionController {
     getActiveTyre(i) {
         return this.x_tyre[i] * this.meter2Pixel;
     }
-    getActiveTyreFile(i) {
-        return this.activeTyre[i] * this.meter2Pixel;
-    }
+    // getActiveTyreFile(i) {
+    //     return this.activeTyre[i] * this.meter2Pixel;
+    // }
 
     // Passive Tyre
     setPassiveTyre(i, value) {        
@@ -614,9 +613,9 @@ class SuspensionController {
     getPassiveTyre(i) {
         return this.xp_tyre[i] * this.meter2Pixel;
     }
-    getPassiveTyreFile(i) {
-        return this.passiveTyre[i] * this.meter2Pixel;
-    }
+    // getPassiveTyreFile(i) {
+    //     return this.passiveTyre[i] * this.meter2Pixel;
+    // }
 
     // Active Suspension
     setActiveSuspension(i, value) {        
@@ -626,9 +625,9 @@ class SuspensionController {
     getActiveSuspension(i) {
         return this.x_suspension[i] * this.meter2Pixel;
     }
-    getActiveSuspensionFile(i) {
-        return this.activeSuspension[i] * this.meter2Pixel;
-    }
+    // getActiveSuspensionFile(i) {
+    //     return this.activeSuspension[i] * this.meter2Pixel;
+    // }
 
     // Passive Suspension
     setPassiveSuspension(i, value) {        
@@ -638,9 +637,9 @@ class SuspensionController {
     getPassiveSuspension(i) {
         return this.xp_suspension[i] * this.meter2Pixel;
     }
-    getPassiveSuspensionFile(i) {
-        return this.passiveSuspension[i] * this.meter2Pixel;
-    }
+    // getPassiveSuspensionFile(i) {
+    //     return this.passiveSuspension[i] * this.meter2Pixel;
+    // }
 
 
     getZr(i) {
@@ -662,15 +661,15 @@ class SuspensionController {
         for(var i = 0; i < count; i++) {
             zeroArray.push(0)
         }
-        this.activeTyre         = zeroArray.concat(this.activeTyre)
-        this.passiveTyre        = zeroArray.concat(this.passiveTyre)
-        this.activeSuspension   = zeroArray.concat(this.activeSuspension)
-        this.passiveSuspension  = zeroArray.concat(this.passiveSuspension)
+        // this.activeTyre         = zeroArray.concat(this.activeTyre)
+        // this.passiveTyre        = zeroArray.concat(this.passiveTyre)
+        // this.activeSuspension   = zeroArray.concat(this.activeSuspension)
+        // this.passiveSuspension  = zeroArray.concat(this.passiveSuspension)
 
-        this.zr         = zeroArray.concat(this.zr)
-        this.zrFile     = zeroArray.concat(this.zrFile)
-        this.zrdot      = zeroArray.concat(this.zrdot)
-        this.zrdotFile  = zeroArray.concat(this.zrdotFile)
+        // this.zr         = zeroArray.concat(this.zr)
+        // this.zrFile     = zeroArray.concat(this.zrFile)
+        // this.zrdot      = zeroArray.concat(this.zrdot)
+        // this.zrdotFile  = zeroArray.concat(this.zrdotFile)
 
         
         this.xp_suspension = zeroArray.concat(this.xp_suspension)

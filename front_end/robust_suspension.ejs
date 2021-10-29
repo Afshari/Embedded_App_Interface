@@ -36,6 +36,7 @@
     <button type="button" class="btn btn-theme"     id="btnPause">Pause</button>
     <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
+    <button type="button" class="btn btn-theme"     id="btnShowTime">Show/Hide Time Line</button>
 </div>
 <br /> <br />
 
@@ -71,7 +72,9 @@ $(document).ready( () => {
         counter = windowWidth;
     });
     $("#btnRequest").click( () => {
-        requestData();    
+        isReadyToDraw = true;
+        controller.addStarterValues(windowWidth)
+        // requestData();    
     });
     $("#btnPause").click( () => {
         isReadyToDraw = !isReadyToDraw;
@@ -80,18 +83,26 @@ $(document).ready( () => {
 
         handleWorkFlow.handleRun( );
     });
+    $("#btnShowTime").click( () => {
+        showTimeLines = !showTimeLines;
+
+        if(isReadyToDraw == false) {
+            drawMainView();
+        }
+    })
 
 } );
 
-function requestData() {
+// function requestData() {
 
-    ipcRenderer.send('robust_suspension:request:read', fileNames[fileIndex]);
-    fileIndex += 1;
-}
+//     ipcRenderer.send('robust_suspension:request:read', fileNames[fileIndex]);
+//     fileIndex += 1;
+// }
 
 
 var counter = windowWidth;
 var isReadyToDraw = false;
+var showTimeLines = false;
 
 var time = 0;
 var dt = 0;
@@ -102,30 +113,33 @@ ipcRenderer.on('robust_suspension:get:values', (event, values) => {
 })
 
 
-ipcRenderer.on('robust_suspension:draw', (event, data) => {
+// ipcRenderer.on('robust_suspension:draw', (event, data) => {
 
-    data = data.split(',');
+//     data = data.split(',');
 
-    if(fileIndex == 1) {
-        controller.activeSuspension = data;
-    } else if(fileIndex == 2) {
-        controller.passiveSuspension = data;
-    } else if(fileIndex == 3) {
-        controller.activeTyre = data;
-    } else if(fileIndex == 4) {
-        controller.passiveTyre = data;
-    } else if(fileIndex == 5) {
-        controller.zrFile = data;
-    } else if(fileIndex == 6) {
-        controller.zrdotFile = data;
-        isReadyToDraw = true;
-        controller.addStarterValues(windowWidth)
-    }
+//     isReadyToDraw = true;
+//     controller.addStarterValues(windowWidth)
 
-    if(fileIndex < 6) {
-        requestData();
-    }
-});
+//     // if(fileIndex == 1) {
+//     //     controller.activeSuspension = data;
+//     // } else if(fileIndex == 2) {
+//     //     controller.passiveSuspension = data;
+//     // } else if(fileIndex == 3) {
+//     //     controller.activeTyre = data;
+//     // } else if(fileIndex == 4) {
+//     //     controller.passiveTyre = data;
+//     // } else if(fileIndex == 5) {
+//     //     controller.zrFile = data;
+//     // } else if(fileIndex == 6) {
+//     //     controller.zrdotFile = data;
+//     //     isReadyToDraw = true;
+//     //     controller.addStarterValues(windowWidth)
+//     // }
+
+//     // if(fileIndex < 6) {
+//     //     requestData();
+//     // }
+// });
 
 function drawLegends() {
 
@@ -156,32 +170,38 @@ function drawBackground() {
     strokeWeight(2);
     stroke(170);
     rect(0, 0, windowWidth, windowHeight);
-
 }
 
-function setup() {
-        
-    createCanvas(windowWidth, windowHeight);
-    
+function drawTimeLines() {
+
+    var line_x = 50;
+
+    strokeWeight(0.3);
+    stroke(0);
+    fill(0);
+    while(line_x < windowWidth) {
+
+        line(line_x, 0, line_x, windowHeight);
+        line_x += 50;
+    }
+
+    strokeWeight(1);
+}
+
+function drawMainView() {
+
     drawBackground();
     drawLegends();
-    
-    // frameRate(5);
-    // console.log("Setup Running...")
-    // noLoop();
-}
 
-function draw() {
+    if(showTimeLines == true)
+        drawTimeLines();
 
-    if(isReadyToDraw == true) {
-
-        drawBackground();
-        drawLegends();
+    console.log( controller.x_suspension.length )
+    if( controller.isDataReady() ) {
 
         translate(0, 3*height/4);
         var firstValue = counter - windowWidth;
         for(var i = counter - windowWidth; i < counter; i++) {
-                        
 
             stroke(255, 0, 0);
             point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
@@ -206,13 +226,34 @@ function draw() {
 
         drawHelper.drawPassive( counter );
         drawHelper.drawActive( counter );
+    }
+}
 
-        if( counter < controller.passiveTyre.length - 15 )
+function setup() {
+        
+    createCanvas(windowWidth, windowHeight);
+    
+    drawBackground();
+    drawLegends();
+    
+    // frameRate(5);
+    // console.log("Setup Running...")
+    // noLoop();
+}
+
+
+function draw() {
+
+
+    if(isReadyToDraw == true) {
+
+        drawMainView();
+
+        if( counter < controller.xp_suspension.length - 15 )
             counter += 15;
         else {
             noLoop();
         }
-
 
     }
     
