@@ -15,6 +15,7 @@ python_codes
 python_codes/*
 ekf_localization/Archives
 suspension/data/*
+inverted_pendulum/data/*
 
 #files
 *.tgz

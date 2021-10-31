@@ -19,6 +19,7 @@ const robust_suspension = require('./robust_suspension');
 const ekf_localization = require('./ekf_localization');
 const pf_localization  = require('./pf_localization');
 const detectron_tracking = require('./detectron_tracking');
+const inverted_pendulum = require('./inverted_pendulum')
 
 
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
@@ -60,6 +61,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	else if(lastPage === 'robust_suspension.ejs')		robust_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
 	else if(lastPage === 'pf_localization.ejs')			pf_localization.deactivate();
+	else if(lastPage === 'inverted_pendulum.ejs')		inverted_pendulum.deactivate();
 
 
 	if(addr === 'rls.ejs') {
@@ -117,6 +119,10 @@ ipcMain.on("menu:page:change", function(event, addr) {
 		robust_suspension.init(win);
 		win.loadFile('front_end/robust_suspension.ejs');
 
+	} else if(addr === 'inverted_pendulum.ejs') {
+
+		inverted_pendulum.init(win);
+		win.loadFile('front_end/inverted_pendulum.ejs')
 	}
 
 	lastPage = addr;

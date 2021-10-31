@@ -78,6 +78,15 @@
             </ul>
         </li>
         <li class="sub-menu">
+            <a class="<%= (PageAddr == 'inverted_pendulum') ? 'active' : '' %>" href="javascript:;">
+            <i class="fa fa-th"></i>
+            <span>Controller</span>
+            </a>
+            <ul class="sub">
+                <li class="<%= PageAddr == 'inverted_pendulum' ? 'active' : '' %>"><a href="inverted_pendulum.ejs" class="sidebar_item">Inverted Pendulum</a></li>
+            </ul>
+        </li>
+        <li class="sub-menu">
             <a class="<%= (PageAddr == 'sot' || PageAddr == 'detectron_tracking' || PageAddr == 'siamfc' || PageAddr == 'kf_tracking') ? 'active' : '' %>" href="javascript:;">
             <i class=" fa fa-tasks"></i>
             <span>Tracking</span>

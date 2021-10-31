@@ -1,0 +1,350 @@
+<%- include('./partial_imports/import_above_content.ejs', { Title: "Inverted Pendulum on a Cart", PageAddr: 'inverted_pendulum' } ) %>
+
+
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Connection Configuration </h4>
+
+        <div class="row mt" id="ip_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt" id="port_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                </div>
+            </div>
+        </div>
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
+<div style="margin: 5px;">
+    <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
+    <button type="button" class="btn btn-theme"     id="btnPause">Pause/Play</button>
+    <button type="button" class="btn btn-primary"   id="btnRequest" >Request</button>
+    <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
+    <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
+    <button type="button" class="btn btn-theme"     id="btnShowTime">Show/Hide Time Line</button>
+</div>
+<br /> <br />
+
+<main>
+</main>
+
+<%- include('./partial_imports/import_below_content.ejs') %>
+
+<script type="text/javascript">
+
+var fileIndex = 0;
+var fileNames = [ 'xe-4', 'xe-3', 'xe-2', 'xe-1' ];
+
+const { Matrix } = require('ml-matrix');
+
+// const { RenderHelper, SuspensionController, DrawHelper, HandleWorkFlow } = require('../classes/cls_robust_suspension');
+const { InvertedPendulum } = require('../classes/cls_inverted_pendulum');
+
+let x0 = new Matrix( [ [-1.0000, 0, 3.7416, 0] ] )
+let wr_ = new Matrix( [ [1, 0, Math.PI, 0] ] ).transpose()
+var t = []
+var inverted_pendulum = new InvertedPendulum( x0, wr_, t );
+var pendulum_values = []
+var drawValue = false
+
+function calcPendulum() {
+
+    const n_ = 10001;
+    const h_ = 0.001;
+    let y0 = new Matrix( [[-1.0000, 0, 3.7416, 0]] ).transpose()
+    pendulum_values = inverted_pendulum.rungekutta4(y0, h_, n_)
+    drawValue = true;
+}
+calcPendulum();
+
+
+// let x_ = new Matrix( [ [ -1.00016725, -0.16693158,  3.74153663, -0.0632417 ] ] ).transpose()
+// let k1 = inverted_pendulum.pendcart(x_)
+// let k2 = inverted_pendulum.pendcart(x_)
+// console.log(k1, k2)
+// console.log( Matrix.add(k1, k2) )
+
+// let y_ = new Matrix( [ [-1.0000, 0, 3.7416, 0] ] ).transpose()
+// console.log('u ', inverted_pendulum.u(y_))
+// y_ = new Matrix( [ [-1.00083214, -0.37263452,  3.74128482, -0.14108158] ] ).transpose()
+// console.log('u ', inverted_pendulum.u(y_))
+
+const windowWidth   = 1200;
+const windowHeight  = 600;
+const halfWidth     = windowWidth / 2;
+
+// var   controller = new SuspensionController();
+// const drawHelper = new DrawHelper( controller, windowWidth );
+
+// var handleWorkFlow = new HandleWorkFlow( controller, ipcRenderer, windowWidth );
+
+$(document).ready( () => {
+
+    $("#btnConnect").click( () => {
+        handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
+    });
+    $("#btnReset").click( () => {
+        counter = 0;
+    });
+    $("#btnRequest").click( () => {
+        ipcRenderer.send('inverted_pendulum:request:read', fileNames[fileIndex]);
+    });
+    $("#btnPause").click( () => {
+        handleWorkFlow.isReadyToDraw = !handleWorkFlow.isReadyToDraw;
+    });
+    $("#btnRun").click( () => {
+
+        handleWorkFlow.handleRun( );
+    });
+    $("#btnShowTime").click( () => {
+        showTimeLines = !showTimeLines;
+
+        if(handleWorkFlow.isReadyToDraw == false) {
+            drawMainView();
+        }
+    })
+
+} );
+
+
+// var counter = windowWidth;
+// var showTimeLines = false;
+
+var arr_x   = []
+var arr_th  = []
+var isReadyToDraw = false;
+const draw_scale = 100;
+
+const m = 1;
+const M = 5;
+const L = 2 * draw_scale;
+
+const W  = 1   * Math.sqrt(M/5) * draw_scale;        // cart width
+const H  = 0.5 * Math.sqrt(M/5) * draw_scale;        // cart height
+const wr = 0.2 * draw_scale;                         // wheel radius
+const mr = 0.3 * Math.sqrt(m)   * draw_scale;        // mass radius
+
+const y = wr / 2 + H / 2;               // cart vertical position
+
+var counter = 0;
+
+ipcRenderer.on('inverted_pendulum:draw', (event, values) => {
+
+    // handleWorkFlow.handleReceivedValues( values );
+    // console.log('values ', values)
+    values = values.split(';')
+    counter = 0
+    arr_x  = []
+    arr_th = []
+
+    for(var i = 0; i < values.length; i++) {
+        var curr_item = values[i].split(',')
+        arr_x.push( parseFloat( curr_item[0] ) )
+        arr_th.push( parseFloat( curr_item[2] ) )
+    }
+
+    isReadyToDraw = true;
+    if(fileIndex < fileNames.length - 1)
+        fileIndex += 1
+
+})
+
+
+function drawLegends() {
+
+    translate(0, 0);
+
+    fill(0, 102, 153);
+    noStroke()
+    textSize(12);
+    textAlign(LEFT, CENTER);
+    text('Active', 40, 30)
+    text('Passive', 40, 50)
+
+    stroke(0, 0, 255);
+    strokeWeight(1.5)
+    line(10, 30, 30, 30);
+
+    stroke(255, 0, 0);
+    strokeWeight(1.5)
+    line(10, 50, 30, 50);
+}
+
+
+function drawBackground() {
+
+    rectMode(CORNER);
+    background(230, 230, 230);
+    fill(210, 210, 210);
+    strokeWeight(2);
+    stroke(170);
+    rect(0, 0, windowWidth, windowHeight);
+}
+
+// function drawTimeLines() {
+
+//     var line_x = 50;
+
+//     strokeWeight(0.3);
+//     stroke(0);
+//     fill(0);
+//     while(line_x < windowWidth) {
+
+//         line(line_x, 0, line_x, windowHeight);
+//         line_x += 50;
+//     }
+
+//     strokeWeight(1);
+// }
+
+// function drawMainView() {
+
+//     drawBackground();
+//     drawLegends();
+
+//     if(showTimeLines == true)
+//         drawTimeLines();
+
+//     console.log( controller.x_suspension.length )
+//     if( controller.isDataReady() ) {
+
+//         translate(0, 3*height/4);
+//         var firstValue = counter - windowWidth;
+//         for(var i = counter - windowWidth; i < counter; i++) {
+
+//             stroke(255, 0, 0);
+//             point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
+//             point(i - firstValue, controller.getPassiveTyre(i));
+
+
+//             stroke(0, 0, 255);
+//             point(i - firstValue, controller.getActiveSuspension(i) + drawHelper.suspensionOffset() );
+//             point(i - firstValue, controller.getActiveTyre(i));
+
+//         }
+
+//         // controller.drawZr( counter, windowWidth );
+//         // controller.drawZrdot( counter, windowWidth );
+
+//         drawHelper.drawPassive( counter );
+//         drawHelper.drawActive( counter );
+//     }
+// }
+
+function setup() {
+        
+    createCanvas(windowWidth, windowHeight);
+    
+    drawBackground();
+    drawLegends();
+    
+    // frameRate(5);
+    // console.log("Setup Running...")
+    // noLoop();
+}
+
+
+function draw() {
+
+
+    if(drawValue == true) {
+
+        drawBackground();
+        drawLegends();
+
+        translate(windowWidth/2, windowHeight/2)
+
+        // console.log(pendulum_values[counter])
+        var x  = pendulum_values[counter].get(0, 0)  * draw_scale;
+        var th = pendulum_values[counter].get(2, 0) // * draw_scale;
+
+        var pendx = x + L * Math.sin(th);
+        var pendy = y + L * Math.cos(th);
+
+        stroke(0);
+        fill(255);
+
+        rect(x - W/2, y - H/2, W, H)
+        line( x, y, pendx, pendy )
+
+        fill(0)
+        ellipseMode(CENTER)
+        circle( pendx, pendy, mr, mr )
+
+        circle(x - 0.9 * W/2+wr/2, H+wr/2, wr, wr)
+        circle(x + 0.9 * W/2-wr/2, H+wr/2, wr, wr)
+
+        if(counter < pendulum_values.length - 10)
+            counter += 10;
+
+    }
+
+    if(isReadyToDraw == true) {
+
+        drawBackground();
+        drawLegends();
+
+        translate(windowWidth/2, windowHeight/2)
+
+        
+        var x  = arr_x[counter]  * draw_scale;
+        var th = arr_th[counter] // * draw_scale;
+
+        var pendx = x + L * Math.sin(th);
+        var pendy = y + L * Math.cos(th);
+
+        stroke(0);
+        fill(255);
+
+        rect(x - W/2, y - H/2, W, H)
+        line( x, y, pendx, pendy )
+
+        fill(0)
+        ellipseMode(CENTER)
+        circle( pendx, pendy, mr, mr )
+
+        circle(x - 0.9 * W/2+wr/2, H+wr/2, wr, wr)
+        circle(x + 0.9 * W/2-wr/2, H+wr/2, wr, wr)
+
+        if(counter < arr_x.length - 10)
+            counter += 10;
+
+//         drawMainView();
+
+//         if( counter < controller.xp_suspension.length - 15 )
+//             counter += 15;
+//         else {
+//             noLoop();
+//         }
+    }
+}
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+

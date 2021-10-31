@@ -32,9 +32,8 @@
 
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
-    <button type="button" class="btn btn-theme"     id="btnRequest">Request</button>
-    <button type="button" class="btn btn-theme"     id="btnPause">Pause</button>
-    <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
+    <button type="button" class="btn btn-theme"     id="btnPause">Pause/Play</button>
+    <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
     <button type="button" class="btn btn-theme"     id="btnShowTime">Show/Hide Time Line</button>
 </div>
@@ -71,13 +70,8 @@ $(document).ready( () => {
     $("#btnReset").click( () => {
         counter = windowWidth;
     });
-    $("#btnRequest").click( () => {
-        isReadyToDraw = true;
-        controller.addStarterValues(windowWidth)
-        // requestData();    
-    });
     $("#btnPause").click( () => {
-        isReadyToDraw = !isReadyToDraw;
+        handleWorkFlow.isReadyToDraw = !handleWorkFlow.isReadyToDraw;
     });
     $("#btnRun").click( () => {
 
@@ -86,22 +80,16 @@ $(document).ready( () => {
     $("#btnShowTime").click( () => {
         showTimeLines = !showTimeLines;
 
-        if(isReadyToDraw == false) {
+        if(handleWorkFlow.isReadyToDraw == false) {
             drawMainView();
         }
     })
 
 } );
 
-// function requestData() {
-
-//     ipcRenderer.send('robust_suspension:request:read', fileNames[fileIndex]);
-//     fileIndex += 1;
-// }
-
 
 var counter = windowWidth;
-var isReadyToDraw = false;
+// var isReadyToDraw = false;
 var showTimeLines = false;
 
 var time = 0;
@@ -113,33 +101,6 @@ ipcRenderer.on('robust_suspension:get:values', (event, values) => {
 })
 
 
-// ipcRenderer.on('robust_suspension:draw', (event, data) => {
-
-//     data = data.split(',');
-
-//     isReadyToDraw = true;
-//     controller.addStarterValues(windowWidth)
-
-//     // if(fileIndex == 1) {
-//     //     controller.activeSuspension = data;
-//     // } else if(fileIndex == 2) {
-//     //     controller.passiveSuspension = data;
-//     // } else if(fileIndex == 3) {
-//     //     controller.activeTyre = data;
-//     // } else if(fileIndex == 4) {
-//     //     controller.passiveTyre = data;
-//     // } else if(fileIndex == 5) {
-//     //     controller.zrFile = data;
-//     // } else if(fileIndex == 6) {
-//     //     controller.zrdotFile = data;
-//     //     isReadyToDraw = true;
-//     //     controller.addStarterValues(windowWidth)
-//     // }
-
-//     // if(fileIndex < 6) {
-//     //     requestData();
-//     // }
-// });
 
 function drawLegends() {
 
@@ -207,18 +168,11 @@ function drawMainView() {
             point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
             point(i - firstValue, controller.getPassiveTyre(i));
 
-            // stroke(0, 255, 0);
-            // point(i - firstValue, controller.getPassiveSuspensionFile(i) + drawHelper.suspensionOffset() + 5 );
-            // point(i - firstValue, controller.getPassiveTyreFile(i) + 5);
-
 
             stroke(0, 0, 255);
             point(i - firstValue, controller.getActiveSuspension(i) + drawHelper.suspensionOffset() );
             point(i - firstValue, controller.getActiveTyre(i));
 
-            // stroke(0, 255, 0);
-            // point(i - firstValue, controller.getActiveSuspensionFile(i) + drawHelper.suspensionOffset() + 5);
-            // point(i - firstValue, controller.getActiveTyreFile(i) + 5);
         }
 
         // controller.drawZr( counter, windowWidth );
@@ -245,7 +199,7 @@ function setup() {
 function draw() {
 
 
-    if(isReadyToDraw == true) {
+    if(handleWorkFlow.isReadyToDraw == true) {
 
         drawMainView();
 
