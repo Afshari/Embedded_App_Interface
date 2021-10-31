@@ -34,6 +34,16 @@ class InvertedPendulum {
         this._k2
         this._k3
         this._k4
+
+        this.y = []
+        this.y_file = []
+    }
+
+    getY(idx) {
+        return this.y[idx]
+    }
+    getYFile(idx) {
+        return this.y_file[idx]
     }
 
     u( y ) {
@@ -63,34 +73,20 @@ class InvertedPendulum {
 
     rungekutta4(y0, h, n) {
 
-        // y = np.zeros((n, len(y0)))
-        // y[0] = y0
-        // for i in range(n - 1):
         var k1, k2, k3, k4
-        let y = []
-        y.push( y0 )
+        this.y = []
+        this.y.push( y0 )
         for(var i = 0; i < n-1; i++) {
 
-            k1 = this.pendcart(y[i])
-            k2 = this.pendcart( Matrix.add( Matrix.div( Matrix.mul( k1, h ), 2.0 ), y[i] ) )
-            k3 = this.pendcart( Matrix.add( Matrix.div( Matrix.mul( k2, h ), 2.0 ), y[i] ) )
-            k4 = this.pendcart( Matrix.add( Matrix.mul( k3, h ), y[i] ) )
+            k1 = this.pendcart(this.y[i])
+            k2 = this.pendcart( Matrix.add( Matrix.div( Matrix.mul( k1, h ), 2.0 ), this.y[i] ) )
+            k3 = this.pendcart( Matrix.add( Matrix.div( Matrix.mul( k2, h ), 2.0 ), this.y[i] ) )
+            k4 = this.pendcart( Matrix.add( Matrix.mul( k3, h ), this.y[i] ) )
             var t_y = Matrix.add( Matrix.add( k1, Matrix.mul( k2, 2 ), Matrix.mul( k3, 2 ) ), k4 )
-            y.push( Matrix.add( y[i], Matrix.mul( t_y, (h/6.0) ) ) )
+            this.y.push( Matrix.add( this.y[i], Matrix.mul( t_y, (h/6.0) ) ) )
         }
 
-        return y
-        //     h = t[i+1] - t[i]
-        //     k1 = f(y[i], t[i], *args)
-        //     k2 = f(y[i] + k1 * h / 2., t[i] + h / 2., *args)
-        //     k3 = f(y[i] + k2 * h / 2., t[i] + h / 2., *args)
-        //     k4 = f(y[i] + k3 * h, t[i] + h, *args)
-        //     print(k1, k2)
-        //     y[i+1] = y[i] + (h / 6.) * (k1 + 2*k2 + 2*k3 + k4)
-            
-        //     if i > 10:
-        //         sys.exit(0)
-        // return y
+        return this.y
     }
 
 }
