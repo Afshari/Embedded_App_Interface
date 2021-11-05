@@ -90,10 +90,12 @@ function readFile(filepath) {
 }
 
 
+var pack_counter = 0;
 client.on('data', function(data) {
 
     data = data.toString();
-    console.log(data.length)
+    pack_counter += 1;
+    console.log(pack_counter, data.length)
     mainWindow.webContents.send('robust_suspension:get:values', data );
 });
 

@@ -43,7 +43,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="192.168.1.23">
                 </div>
             </div>
         </div>
@@ -52,7 +52,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5555">
                 </div>
             </div>
         </div>
@@ -75,7 +75,6 @@
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
     <button type="button" class="btn btn-theme"     id="btnReplay">Replay</button>
-    <button type="button" class="btn btn-primary"   id="btnRequest" >Request From File</button>
     <button type="button" class="btn btn-primary"   id="btnCalculate" >Calculate</button>
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
@@ -89,27 +88,25 @@
 
 <script type="text/javascript">
 
-var fileIndex = 0;
-var fileNames = [ 'xe-4', 'xe-3', 'xe-2', 'xe-1' ];
+// var fileIndex = 0;
+// var fileNames = [ 'xe-4', 'xe-3', 'xe-2', 'xe-1' ];
 
 const { Matrix } = require('ml-matrix');
 
-const { InvertedPendulum } = require('../classes/cls_inverted_pendulum');
+const { InvertedPendulum, HandleWorkFlow } = require('../classes/cls_inverted_pendulum');
 
-let x0 = new Matrix( [ [-1.0000, 0, 3.7416, 0] ] )
-const wr_ = new Matrix( [ [0, 0, Math.PI, 0] ] ).transpose()
+let x0 = new Matrix( [ [-1.00, 0, 3.7416, 0] ] )
+const ref_pos = new Matrix( [ [0, 0, Math.PI, 0] ] ).transpose()
 var t = []
-var inverted_pendulum = new InvertedPendulum( x0, wr_, t );
+var inverted_pendulum = new InvertedPendulum( x0, ref_pos, t );
 
 var isReadyToDraw = false
-var isReadyToDraw_file = false;
+const n_ = 10000;
+const h_ = 0.001;
+
 
 function calcPendulum() {
 
-    const n_ = 10001;
-    const h_ = 0.001;
-    // let y0 = new Matrix( [[-1.0000, 0, 3.7416, 0]] ).transpose()
-    // let y0 = new Matrix( [[-1.0000, 0, 2.5416, 0]] ).transpose()
     inverted_pendulum.rungekutta4(x0, h_, n_)
     counter = 0
     isReadyToDraw = true;
@@ -123,7 +120,7 @@ const halfWidth     = windowWidth / 2;
 // var   controller = new SuspensionController();
 // const drawHelper = new DrawHelper( controller, windowWidth );
 
-// var handleWorkFlow = new HandleWorkFlow( controller, ipcRenderer, windowWidth );
+var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth );
 
 $(document).ready( () => {
 
@@ -132,26 +129,26 @@ $(document).ready( () => {
     });
     $("#btnReset").click( () => {
         counter = 0;
-        counter_file = 0
+        counter_remote = -40
         isReadyToDraw = false
-        isReadyToDraw_file = false
         var angle = $('#angle_range').val();
         x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
         drawBackground();
         drawLegends();
         drawCart(x0.get(0, 0), x0.get(2, 0))
     });
-    $("#btnRequest").click( () => {
-        ipcRenderer.send('inverted_pendulum:request:read', fileNames[fileIndex]);
-    });
+    // $("#btnRequest").click( () => {
+    //     ipcRenderer.send('inverted_pendulum:request:read', fileNames[fileIndex]);
+    // });
     $("#btnReplay").click( () => {
         counter = 0;
+        counter_remote = -40;
     });
     $("#btnCalculate").click( () => {
         calcPendulum()
     });
     $("#btnRun").click( () => {
-        handleWorkFlow.handleRun( );
+        handleWorkFlow.handleRun( ref_pos, x0, n_, h_ );
     });
     $(document).on('input', '#angle_range', function() {
         var angle = $(this).val();
@@ -179,23 +176,38 @@ const mr = 0.3  * Math.sqrt(m)   * draw_scale;        // mass radius
 const y = wr / 2 + H / 2;               // cart vertical position
 
 var counter = 0;
-var counter_file = 0
+var counter_remote = -40
 
-ipcRenderer.on('inverted_pendulum:draw', (event, values) => {
+// ipcRenderer.on('inverted_pendulum:draw', (event, values) => {
 
-    values = values.split(';')
-    counter_file = 0
-    inverted_pendulum.y_file = []
+//     values = values.split(';')
+//     counter_file = 0
+//     inverted_pendulum.y_file = []
 
-    for(var i = 0; i < values.length; i++) {
-        var curr_item = values[i].split(',')
-        inverted_pendulum.y_file.push( [ curr_item[0], 0, curr_item[2], 0 ] )
+//     for(var i = 0; i < values.length; i++) {
+//         var curr_item = values[i].split(',')
+//         inverted_pendulum.y_file.push( [ curr_item[0], 0, curr_item[2], 0 ] )
+//     }
+
+//     isReadyToDraw_file = true;
+//     if(fileIndex < fileNames.length - 1)
+//         fileIndex += 1
+// })
+
+ipcRenderer.on('inverted_pendulum:get:values', (event, values, isFinished) => {
+
+    if(isFinished == true) {
+
+        counter_remote = -40
+        isReadyToDraw = true
+    } else {
+        values = values.split(';')
+        for(var i = 0; i < values.length; i++) {
+            var arr = values[i].split(',')
+            inverted_pendulum.y_remote.push( [ parseFloat(arr[0]), parseFloat(arr[1]) ] )
+        }
+        ipcRenderer.send('inverted_pendulum:tcp:send:state', 112)
     }
-
-    isReadyToDraw_file = true;
-    if(fileIndex < fileNames.length - 1)
-        fileIndex += 1
-
 })
 
 
@@ -230,55 +242,7 @@ function drawBackground() {
     rect(0, 0, windowWidth, windowHeight);
 }
 
-// function drawTimeLines() {
 
-//     var line_x = 50;
-
-//     strokeWeight(0.3);
-//     stroke(0);
-//     fill(0);
-//     while(line_x < windowWidth) {
-
-//         line(line_x, 0, line_x, windowHeight);
-//         line_x += 50;
-//     }
-
-//     strokeWeight(1);
-// }
-
-// function drawMainView() {
-
-//     drawBackground();
-//     drawLegends();
-
-//     if(showTimeLines == true)
-//         drawTimeLines();
-
-//     console.log( controller.x_suspension.length )
-//     if( controller.isDataReady() ) {
-
-//         translate(0, 3*height/4);
-//         var firstValue = counter - windowWidth;
-//         for(var i = counter - windowWidth; i < counter; i++) {
-
-//             stroke(255, 0, 0);
-//             point(i - firstValue, controller.getPassiveSuspension(i) + drawHelper.suspensionOffset() );
-//             point(i - firstValue, controller.getPassiveTyre(i));
-
-
-//             stroke(0, 0, 255);
-//             point(i - firstValue, controller.getActiveSuspension(i) + drawHelper.suspensionOffset() );
-//             point(i - firstValue, controller.getActiveTyre(i));
-
-//         }
-
-//         // controller.drawZr( counter, windowWidth );
-//         // controller.drawZrdot( counter, windowWidth );
-
-//         drawHelper.drawPassive( counter );
-//         drawHelper.drawActive( counter );
-//     }
-// }
 
 function setup() {
         
@@ -322,33 +286,29 @@ function drawCart( x, th ) {
 function draw() {
 
 
-    if(isReadyToDraw_file == true || isReadyToDraw == true ) {
-
-        drawBackground();
-        drawLegends();
-    }
  
     if(isReadyToDraw == true) {
 
-        var x  = inverted_pendulum.y[counter].get(0, 0)  * draw_scale;
-        var th = inverted_pendulum.y[counter].get(2, 0);
+        drawBackground();
+        drawLegends();
+
+        // var x  = inverted_pendulum.y[counter].get(0, 0)  * draw_scale;
+        // var th = inverted_pendulum.y[counter].get(2, 0);
+        // drawCart( x, th )
+
+        // if(counter < inverted_pendulum.y.length - 40)
+        //     counter += 40;
+
+        var curr_counter_remote = ( counter_remote < 0 ) ? 0 : counter_remote;
+
+        var x  = inverted_pendulum.y_remote[curr_counter_remote][0]  * draw_scale;
+        var th = inverted_pendulum.y_remote[curr_counter_remote][1]
         drawCart( x, th )
 
-        if(counter < inverted_pendulum.y.length - 40)
-            counter += 40;
+        if(counter_remote < inverted_pendulum.y_remote.length - 1)
+            counter_remote += 1;
 
     }
-
-    if(isReadyToDraw_file == true) {
-                
-        var x  = inverted_pendulum.y_file[counter_file][0]  * draw_scale;
-        var th = inverted_pendulum.y_file[counter_file][2];
-
-        drawCart( x, th )
-
-
-        if(counter_file < inverted_pendulum.y_file.length - 40)
-            counter_file += 40;
 
 //         drawMainView();
 
@@ -357,7 +317,6 @@ function draw() {
 //         else {
 //             noLoop();
 //         }
-    }
 }
 
 </script>

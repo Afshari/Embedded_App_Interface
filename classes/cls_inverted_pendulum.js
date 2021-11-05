@@ -29,21 +29,15 @@ class InvertedPendulum {
 
         this.K          =  new Matrix( [ [ -31.6228,  -61.4401,  647.0460,  250.0313 ] ] )
 
-        // cache the k1, k2, k3, k4 of each step
-        this._k1
-        this._k2
-        this._k3
-        this._k4
-
         this.y = []
-        this.y_file = []
+        this.y_remote = []
     }
 
     getY(idx) {
         return this.y[idx]
     }
-    getYFile(idx) {
-        return this.y_file[idx]
+    getRemote(idx) {
+        return this.y_remote[idx]
     }
 
     u( y ) {
@@ -94,10 +88,10 @@ class InvertedPendulum {
 
 class HandleWorkFlow {
 
-    constructor( controller, ipcRenderer, windowWidth ) {
+    constructor( inverted_pendulum, ipcRenderer, windowWidth ) {
 
         this.state              =   State.ready;
-        this.controller         =   controller;
+        this.inverted_pendulum  =   inverted_pendulum;
         this.ipcRenderer        =   ipcRenderer;
         this.windowWidth        =   windowWidth;
         this.counter            =   windowWidth;
@@ -106,7 +100,7 @@ class HandleWorkFlow {
     }
 
     handleConnect(ip, port) {
-        this.ipcRenderer.send('robust_suspension:connect', ip, port);
+        this.ipcRenderer.send('inverted_pendulum:connect', ip, port);
     }
 
     handleStep() {
@@ -130,7 +124,7 @@ class HandleWorkFlow {
         }
     }
 
-    handleRun( ) {
+    handleRun( ref_pos, x0, n_, h_ ) {
 
         if( this.isStateReady() ) {
 
@@ -139,8 +133,7 @@ class HandleWorkFlow {
             // this.uart = c_uart;
             // this.estimator.init( )
 
-            this.ipcRenderer.send('robust_suspension:tcp:send:state', 101,
-                this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
+            this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 111, ref_pos.data, x0.data, n_, h_ );
 
         } else if( this.isStatePause() ) {
 
