@@ -17,6 +17,8 @@ ekf_localization/Archives
 suspension/data/*
 inverted_pendulum/data/*
 
+freq_code.js.arch
+
 #files
 *.tgz
 *.log

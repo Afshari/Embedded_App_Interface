@@ -75,7 +75,6 @@
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
     <button type="button" class="btn btn-theme"     id="btnReplay">Replay</button>
-    <button type="button" class="btn btn-primary"   id="btnCalculate" >Calculate</button>
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
 </div>
@@ -100,7 +99,7 @@ const ref_pos = new Matrix( [ [0, 0, Math.PI, 0] ] ).transpose()
 var t = []
 var inverted_pendulum = new InvertedPendulum( x0, ref_pos, t );
 
-var isReadyToDraw = false
+// var isReadyToDraw = false
 const n_ = 10000;
 const h_ = 0.001;
 
@@ -108,7 +107,7 @@ const h_ = 0.001;
 function calcPendulum() {
 
     inverted_pendulum.rungekutta4(x0, h_, n_)
-    counter = 0
+    // counter = 0
     isReadyToDraw = true;
 }
 
@@ -117,7 +116,6 @@ const windowWidth   = 1200;
 const windowHeight  = 600;
 const halfWidth     = windowWidth / 2;
 
-// var   controller = new SuspensionController();
 // const drawHelper = new DrawHelper( controller, windowWidth );
 
 var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth );
@@ -128,34 +126,34 @@ $(document).ready( () => {
         handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });
     $("#btnReset").click( () => {
-        counter = 0;
-        counter_remote = -40
-        isReadyToDraw = false
-        var angle = $('#angle_range').val();
-        x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
-        drawBackground();
-        drawLegends();
-        drawCart(x0.get(0, 0), x0.get(2, 0))
+        
+        if(handleWorkFlow.isStateDrawing() || handleWorkFlow.isStateFinish()) {
+            handleWorkFlow.state2Ready();
+            handleWorkFlow.counter_remote = -40
+            handleWorkFlow.isReadyToDraw = false
+            var angle = $('#angle_range').val();
+            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
+            drawBackground();
+            drawCart(x0.get(0, 0), x0.get(2, 0))
+        }
     });
-    // $("#btnRequest").click( () => {
-    //     ipcRenderer.send('inverted_pendulum:request:read', fileNames[fileIndex]);
-    // });
+
     $("#btnReplay").click( () => {
-        counter = 0;
-        counter_remote = -40;
+        handleWorkFlow.handleReplay()
+        // handleWorkFlow.counter_remote = -40;
     });
-    $("#btnCalculate").click( () => {
-        calcPendulum()
-    });
+
     $("#btnRun").click( () => {
         handleWorkFlow.handleRun( ref_pos, x0, n_, h_ );
     });
     $(document).on('input', '#angle_range', function() {
-        var angle = $(this).val();
-        x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
-        drawBackground();
-        drawLegends();
-        drawCart(x0.get(0, 0), x0.get(2, 0))
+
+        if(handleWorkFlow.isStateStart() || handleWorkFlow.isStateReady()) {
+            var angle = $(this).val();
+            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
+            drawBackground();
+            drawCart(x0.get(0, 0), x0.get(2, 0))
+        }
     });
 
 } );
@@ -175,61 +173,11 @@ const mr = 0.3  * Math.sqrt(m)   * draw_scale;        // mass radius
 
 const y = wr / 2 + H / 2;               // cart vertical position
 
-var counter = 0;
-var counter_remote = -40
-
-// ipcRenderer.on('inverted_pendulum:draw', (event, values) => {
-
-//     values = values.split(';')
-//     counter_file = 0
-//     inverted_pendulum.y_file = []
-
-//     for(var i = 0; i < values.length; i++) {
-//         var curr_item = values[i].split(',')
-//         inverted_pendulum.y_file.push( [ curr_item[0], 0, curr_item[2], 0 ] )
-//     }
-
-//     isReadyToDraw_file = true;
-//     if(fileIndex < fileNames.length - 1)
-//         fileIndex += 1
-// })
 
 ipcRenderer.on('inverted_pendulum:get:values', (event, values, isFinished) => {
 
-    if(isFinished == true) {
-
-        counter_remote = -40
-        isReadyToDraw = true
-    } else {
-        values = values.split(';')
-        for(var i = 0; i < values.length; i++) {
-            var arr = values[i].split(',')
-            inverted_pendulum.y_remote.push( [ parseFloat(arr[0]), parseFloat(arr[1]) ] )
-        }
-        ipcRenderer.send('inverted_pendulum:tcp:send:state', 112)
-    }
+    handleWorkFlow.handleReceivedValues( values, isFinished )
 })
-
-
-function drawLegends() {
-
-    translate(0, 0);
-
-    fill(0, 102, 153);
-    noStroke()
-    textSize(12);
-    textAlign(LEFT, CENTER);
-    text('Active', 40, 30)
-    text('Passive', 40, 50)
-
-    stroke(0, 0, 255);
-    strokeWeight(1.5)
-    line(10, 30, 30, 30);
-
-    stroke(255, 0, 0);
-    strokeWeight(1.5)
-    line(10, 50, 30, 50);
-}
 
 
 function drawBackground() {
@@ -249,11 +197,7 @@ function setup() {
     createCanvas(windowWidth, windowHeight);
     
     drawBackground();
-    drawLegends();
     
-    // frameRate(5);
-    // console.log("Setup Running...")
-    // noLoop();
     drawCart( 0, Math.PI )
 }
 
@@ -261,8 +205,6 @@ function drawCart( x, th ) {
 
     push();
     translate(windowWidth/2, windowHeight/2)
-    // var x  = inverted_pendulum.y[counter].get(0, 0)  * draw_scale;
-    // var th = inverted_pendulum.y[counter].get(2, 0) // * draw_scale;
 
     var pendx = x + L * Math.sin(th);
     var pendy = y + L * Math.cos(th);
@@ -287,10 +229,10 @@ function draw() {
 
 
  
-    if(isReadyToDraw == true) {
+    // if(handleWorkFlow.isReadyToDraw == true) {
+    if(handleWorkFlow.isStateDrawing()) {
 
         drawBackground();
-        drawLegends();
 
         // var x  = inverted_pendulum.y[counter].get(0, 0)  * draw_scale;
         // var th = inverted_pendulum.y[counter].get(2, 0);
@@ -299,24 +241,18 @@ function draw() {
         // if(counter < inverted_pendulum.y.length - 40)
         //     counter += 40;
 
-        var curr_counter_remote = ( counter_remote < 0 ) ? 0 : counter_remote;
+        var curr_counter_remote = ( handleWorkFlow.counter_remote < 0 ) ? 0 : handleWorkFlow.counter_remote;
 
         var x  = inverted_pendulum.y_remote[curr_counter_remote][0]  * draw_scale;
         var th = inverted_pendulum.y_remote[curr_counter_remote][1]
         drawCart( x, th )
 
-        if(counter_remote < inverted_pendulum.y_remote.length - 1)
-            counter_remote += 1;
+        if(handleWorkFlow.counter_remote < inverted_pendulum.y_remote.length - 1)
+            handleWorkFlow.counter_remote += 1;
+        else
+            handleWorkFlow.state2Finish();
 
     }
-
-//         drawMainView();
-
-//         if( counter < controller.xp_suspension.length - 15 )
-//             counter += 15;
-//         else {
-//             noLoop();
-//         }
 }
 
 </script>

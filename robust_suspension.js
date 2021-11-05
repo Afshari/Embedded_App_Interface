@@ -69,25 +69,10 @@ ipcMain.on('robust_suspension:tcp:send:state', (event, code, w, ms, rnd, ITEM_PE
         dataStr += `${w.get(0, i).toFixed(4)},${ms.get(0, i).toFixed(1)}`
     }
 
-    // dataStr = `101:${dataStr}`
     dataStr = `${code}:${dataStr}`
     dataStr = `S${dataStr.length}:${dataStr}E`
-    // console.log('Data Length: ', dataStr.length)
     client.write(dataStr)
 })
-
-function readFile(filepath) {
-
-    fs.readFile(filepath, 'utf-8', (err, data) => {
-        if(err){
-            console.log("An error ocurred reading the file :" + err.message);
-            return;
-        }
-    
-        mainWindow.webContents.send('robust_suspension:draw', data.toString() );
-        // console.log("The file content is : " + data);
-    });
-}
 
 
 var pack_counter = 0;
@@ -99,8 +84,3 @@ client.on('data', function(data) {
     mainWindow.webContents.send('robust_suspension:get:values', data );
 });
 
-// ipcMain.on('robust_suspension:request:read', (event, filename) => {
-
-//     const filepath = `suspension/data/${filename}.txt`;
-//     readFile( filepath );
-// })
