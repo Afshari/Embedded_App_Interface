@@ -1,5 +1,105 @@
 <%- include('./partial_imports/import_above_content.ejs', { Title: "Robust Suspension", PageAddr: 'robust_suspension' } ) %>
 
+<style>
+.slider {
+    -webkit-appearance: none;
+    width: 50%;
+    height: 15px;
+    border-radius: 5px;  
+    background: #d3d3d3;
+    outline: none;
+    opacity: 0.7;
+    -webkit-transition: .2s;
+    transition: opacity .2s;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%; 
+    background: #04AA6D;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #04AA6D;
+    cursor: pointer;
+}
+
+ /* Customize the label (the container) */
+ .container {
+  display: block;
+  position: relative;
+  padding-left: 35px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Hide the browser's default checkbox */
+.container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* Create a custom checkbox */
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  background-color: #eee;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input ~ .checkmark {
+  background-color: #ccc;
+}
+
+/* When the checkbox is checked, add a blue background */
+.container input:checked ~ .checkmark {
+  background-color: #04AA6D;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+/* Show the checkmark when checked */
+.container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+/* Style the checkmark/indicator */
+.container .checkmark:after {
+  left: 9px;
+  top: 5px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+} 
+
+</style>
 
 <div class="row mt">
     <div class="col-lg-12">
@@ -19,7 +119,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5555" value="5555">
                 </div>
             </div>
         </div>
@@ -30,21 +130,136 @@
     <!-- /col-lg-12 -->
 </div>
 
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Bump Road Configuration </h4>
+
+        <div class="row mt" id="port_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Bump Length</label>
+                <div class="col-sm-4" style="padding-left: 0px; margin-top: 10px;">
+                    <input type="range" min="50" max="300" value="200" class="slider" id="bump_length">
+                </div>
+                <label class="col-sm-2 control-label" id="label_length" style="padding-left: 20px; width: 16%;">2 meter</label>
+            </div>
+        </div>
+
+        <div class="row mt" id="port_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Bump Height</label>
+                <div class="col-sm-4" style="padding-left: 0px; margin-top: 10px;">
+                    <input type="range" min="5" max="50" value="10" class="slider" id="bump_height">
+                </div>
+                <label class="col-sm-2 control-label" id="label_height" style="padding-left: 20px; width: 16%;">0.1 meter</label>
+            </div>
+        </div>
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
+
+<div id="bumpCanvas">
+</div>
+
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
     <button type="button" class="btn btn-theme"     id="btnPause">Pause/Play</button>
+    <button type="button" class="btn btn-theme"     id="btnReplay">Replay</button>
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
-    <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
     <button type="button" class="btn btn-theme"     id="btnShowTime">Show/Hide Time Line</button>
 </div>
-<br /> <br />
+<label class="container"> Show Passive
+    <input type="checkbox" id="checkbox_passive" checked>
+    <span class="checkmark"></span>
+</label>
+<label class="container">Show Active
+    <input type="checkbox" id="checkbox_active" checked>
+    <span class="checkmark"></span>
+</label>
+<!-- <br /> -->
 
-<main>
+<main id="mainCanvas">
 </main>
 
 <%- include('./partial_imports/import_below_content.ejs') %>
 
 <script type="text/javascript">
+
+let nb = 159
+let l  = 2
+let v0 = 45/3.6
+let a  = 0.1
+
+var showActive = true;
+var showPassive = true;
+
+$("#checkbox_active").change(function() {
+    showActive = this.checked
+});
+
+$("#checkbox_passive").change(function() {
+    showPassive = this.checked
+});
+
+var s1 = function( sketch ) {
+
+    let dt = 0.001
+
+    $(document).on('input', '#bump_length', function() {
+
+        l = $(this).val() / 100;
+        $("#label_length").text(l + " meter")
+    });
+
+    $(document).on('input', '#bump_height', function() {
+
+        a = $(this).val() / 100;
+        $("#label_height").text(a + " meter")
+    });
+
+
+    sketch.setup = function() {
+      let canvas1 = sketch.createCanvas(900, 100, sketch.WEBGL);
+      canvas1.parent("bumpCanvas");
+      sketch.frameRate(1)
+      // canvas1.position(0,0);
+    }
+    sketch.draw = function() {
+      //for canvas 1
+        sketch.background(255);
+        sketch.stroke(0);
+        sketch.strokeWeight(0.8);
+        sketch.fill(0);
+
+        const gv = l / v0;
+        var vl = 0;
+
+        for(var i = 0; i < 1000; i++) {
+            var t = i * dt
+            if(t < gv && vl < t) {
+                vl = t
+                nb = i;
+            }
+        }
+        console.log('nb ', nb)
+        
+        // sketch.line(0, 0, 100, 100)
+        for(var i = 0; i < nb; i++) {
+            var t = i * dt
+            var theta = 2 * Math.PI * v0 * t / l;
+            var y = 30 - ( 0.5 * a * (1-Math.cos(theta)) * 40 )
+            // sketch.point( (i*2)-200, y )
+            sketch.circle( (i*2)-windowWidth/4, y, 1.5 )
+        }
+    }
+  };
+  
+  // create a new instance of p5 and pass in the function for sketch 1
+  new p5(s1);
+
 
 var fileIndex = 0;
 var fileNames = [ 'x1', 'xp1', 'x2', 'xp2', 'zr', 'zrdot' ];
@@ -67,7 +282,7 @@ $(document).ready( () => {
     $("#btnConnect").click( () => {
         handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });
-    $("#btnReset").click( () => {
+    $("#btnReplay").click( () => {
         counter = windowWidth;
     });
     $("#btnPause").click( () => {
@@ -75,6 +290,11 @@ $(document).ready( () => {
     });
     $("#btnRun").click( () => {
 
+        handleWorkFlow.isReadyToDraw = false;
+        counter = windowWidth
+        drawBackground();
+        drawLegends();
+        controller.init( a, l );
         handleWorkFlow.handleRun( );
     });
     $("#btnShowTime").click( () => {
@@ -99,7 +319,6 @@ ipcRenderer.on('robust_suspension:get:values', (event, values) => {
 
     handleWorkFlow.handleReceivedValues( values );
 })
-
 
 
 function drawLegends() {
@@ -157,7 +376,7 @@ function drawMainView() {
     if(showTimeLines == true)
         drawTimeLines();
 
-    console.log( controller.x_suspension.length )
+    // console.log( controller.x_suspension.length )
     if( controller.isDataReady() ) {
 
         translate(0, 3*height/4);
@@ -178,8 +397,10 @@ function drawMainView() {
         // controller.drawZr( counter, windowWidth );
         // controller.drawZrdot( counter, windowWidth );
 
-        drawHelper.drawPassive( counter );
-        drawHelper.drawActive( counter );
+        if(showPassive)
+            drawHelper.drawPassive( counter );
+        if(showActive)
+            drawHelper.drawActive( counter );
     }
 }
 
@@ -188,30 +409,23 @@ function setup() {
     createCanvas(windowWidth, windowHeight);
     
     drawBackground();
-    drawLegends();
-    
-    // frameRate(5);
-    // console.log("Setup Running...")
-    // noLoop();
+    drawLegends();    
 }
 
 
 function draw() {
 
-
     if(handleWorkFlow.isReadyToDraw == true) {
 
         drawMainView();
 
-        if( counter < controller.xp_suspension.length - 15 )
-            counter += 15;
+        if( counter < controller.xp_suspension.length - 10 )
+            counter += 10;
         else {
-            noLoop();
+            // noLoop();
         }
 
     }
-    
-
 }
 
 </script>

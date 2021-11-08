@@ -1,9 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
 
-const SerialPort = require('serialport');
-const  ByteLength = require('@serialport/parser-byte-length');
+// const  SerialPort = require('serialport');
+// const  ByteLength = require('@serialport/parser-byte-length');
 
+const net = require('net')
 var linearAlgebra = require('linear-algebra')(),     // initialise it
 					Vector = linearAlgebra.Vector,
 					Matrix = linearAlgebra.Matrix;
@@ -24,13 +25,11 @@ module.exports = {
 	deactivate
 }					
 
-
 function init(win) {
 
     mainWindow = win
 	_isActive = true
 }
-
 
 function deactivate() {
     _isActive = false;
@@ -41,19 +40,60 @@ function isActive() {
     return _isActive;
 }
 
+var client = new net.Socket();
+
+function connect(ip, port) {
+    client.connect(port, ip, function() {
+        _isConnected = true;
+        console.log('Connected');
+    });
+}
+
+ipcMain.on('rls:tcp:connect', (event, ip, port) => {
+
+    connect(ip, port);
+})
+
+ipcMain.on('rls:tcp:send:state', (event, code, w, ms, rnd, ITEM_PER_STEP) => {
+
+    let dataStr = "";
+
+    w = new Matrix( w.data );
+    ms = new Matrix( ms.data );
+    for(var i = rnd; i < rnd + ITEM_PER_STEP; i++) {
+
+        if(dataStr !== "")
+            dataStr += ",";
+        dataStr += `${w.get(0, i).toFixed(4)},${ms.get(0, i).toFixed(1)}`
+    }
+
+    dataStr = `${code}:${dataStr}`
+    dataStr = `S${dataStr.length}:${dataStr}E`
+    client.write(dataStr)
+})
+
+
+client.on('data', function(data) {
+
+    data = data.toString();
+    // console.log(data.length)
+    mainWindow.webContents.send('rls:get:values', data );
+});
+
 
 function sendCommandUart(code, measurement) {
 
     let strData = `${code}:${measurement}`;
     strData = `${strData.length}:${strData}`;
+	console.log('strData ', strData)
     for(var i = strData.length; i < UART_DATA_LENGTH; i++) {
         strData += "_";
     }
 
-    port.write(strData, (err) => {
-        if(err) 
-            console.log('Error on write: ', err.message);
-    });
+    // port.write(strData, (err) => {
+    //     if(err) 
+    //         console.log('Error on write: ', err.message);
+    // });
 }
 
 
@@ -81,9 +121,10 @@ function prepareData() {
 
 		sendCommandUart(111, `${strH1},${strH2},${strY}`);
 	}
-
 	k += 1;
 }
+
+
 
 let finished = false;
 ipcMain.on('rls:ready:receive', (event, uart) => {
@@ -132,10 +173,6 @@ ipcMain.on('rls:ready:receive', (event, uart) => {
 
 		prepareData();
 	}
-
-
-
-
 });
 
 

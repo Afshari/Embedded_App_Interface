@@ -80,7 +80,7 @@ client.on('data', function(data) {
 
     data = data.toString();
     pack_counter += 1;
-    console.log(pack_counter, data.length)
+    // console.log(pack_counter, data.length)
     mainWindow.webContents.send('robust_suspension:get:values', data );
 });
 

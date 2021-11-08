@@ -366,21 +366,19 @@ class HandleWorkFlow {
 
     handleRun( ) {
 
-        if( this.isStateReady() ) {
+        // if( this.isStateReady() ) {
 
-            this.state2SendingMeasurements();
-            // this.connection_type = c_type;
-            // this.uart = c_uart;
-            // this.estimator.init( )
+            // this.state2SendingMeasurements();
+            this.rnd = 0
 
             this.ipcRenderer.send('robust_suspension:tcp:send:state', 101,
                 this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
-        } else if( this.isStatePause() ) {
+        // } else if( this.isStatePause() ) {
 
-            this.state2Running();
-            window.frameRate(40);
-        }
+        //     this.state2Running();
+        //     window.frameRate(40);
+        // }
     }
 
     handleReset() {
@@ -445,10 +443,10 @@ class SuspensionController {
 
     constructor() {
 
-        this.init( 12 )
+        this.init( 0.1, 2 )
     }
 
-    init( tm ) {
+    init( a, l ) {
 
         this.passiveSuspension      = []
         this.passiveTyre            = []
@@ -459,7 +457,7 @@ class SuspensionController {
         this.zrdot                  = []
         this.zrdotFile              = []
 
-        this.meter2Pixel = 500;
+        this.meter2Pixel = 200;
 
         
         this.dt = 0.001;
@@ -477,8 +475,8 @@ class SuspensionController {
         this.nx = 4;
         this.nz = 3;
 
-        this.a      = 0.1;
-        this.l      = 2;
+        this.a      = a;                  // 0.1;              // Height of the Bump
+        this.l      = l;                  // 2;                // Length of the Bump
         this.v0     = 45/3.6;
         this.nb     = 0;
         this.zr     = [];
@@ -502,12 +500,12 @@ class SuspensionController {
         this.mu =   113.6;                   // unsprung mass
         this.ks =   42719.6;                 // stiffness of passive suspension
         this.cs =   1095;                    // damping of passive suspension
-        this.kt =   101115;                  // stiffness of pneumatic tire
-        this.ct =   14.6;                    // damping of pneumatic tire
+        this.kt =   101115;                  // stiffness of pneumatic tyre
+        this.ct =   14.6;                    // damping of pneumatic tyre
 
 
         this.alpha  =   21;                     // positive weighting for suspension deflection
-        this.beta   =   42;                     // positive weighting for tire deflection
+        this.beta   =   42;                     // positive weighting for tyre deflection
 
         this.D = new Matrix( [ [ 0, -1, 0, this.ct/this.mu ] ] ).transpose()
         this.w = new Matrix( [ this.zrdot ] );
@@ -670,6 +668,7 @@ class SuspensionController {
                 this.nb = i;
             }
         }
+        // console.log('nb ', this.nb)
 
         for(var i = 0; i < this.nb; i++) {
             var theta = 2 * Math.PI * this.v0 * this.t[i] / this.l;
@@ -736,20 +735,28 @@ class DrawHelper {
 
         const suspensionOffset = this.suspensionOffset();
 
+        var minPart = this.controller.getPassiveTyre(counter-this.halfWidth) - 50
+        var tSuspensionY = this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 125
+        tSuspensionY = ( tSuspensionY < minPart ) ? tSuspensionY : minPart
+
         window.line(this.windowWidth/2+35, this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 25, 
-                    this.windowWidth/2+35, this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 125 );
-        window.line(this.windowWidth/2+25, this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 125, 
-                    this.windowWidth/2+45, this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 125 );
+                    this.windowWidth/2+35, tSuspensionY );
+        window.line(this.windowWidth/2+25, tSuspensionY, 
+                    this.windowWidth/2+45, tSuspensionY );
     }
 
     drawPassiveBottomSuspension( counter ) {
 
         const tyreOffset = this.tyreOffset();
 
+        var maxPart = this.controller.getPassiveSuspension(counter-this.halfWidth) + this.suspensionOffset() + 25
+        var bSuspensionY = this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset - 225
+        bSuspensionY = ( bSuspensionY > maxPart ) ? bSuspensionY : maxPart
+
         window.line(this.windowWidth/2+25, this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset, 
-                    this.windowWidth/2+25, this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset - 125 );
+                    this.windowWidth/2+25, bSuspensionY );
         window.line(this.windowWidth/2+45, this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset, 
-                    this.windowWidth/2+45, this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset - 125 );
+                    this.windowWidth/2+45, bSuspensionY );
         // window.stroke(0);
         // window.fill(0);
         window.rectMode(window.CORNER);
@@ -770,24 +777,28 @@ class DrawHelper {
         var pUp     = this.controller.getPassiveSuspension(counter-this.halfWidth) + suspensionOffset + 75;
         var pBottom = this.controller.getPassiveTyre(counter-this.halfWidth) + tyreOffset - 50;
         
-        var p1 = pBottom - Math.abs(pUp - pBottom)/9;
-        var p2 = p1 - Math.abs(pUp - pBottom)/9;
-        var p3 = p2 - Math.abs(pUp - pBottom)/9;
-        var p4 = p3 - Math.abs(pUp - pBottom)/9;
-        var p5 = p4 - Math.abs(pUp - pBottom)/9;
-        var p6 = p5 - Math.abs(pUp - pBottom)/9;
-        var p7 = p6 - Math.abs(pUp - pBottom)/9;
-        var p8 = p7 - Math.abs(pUp - pBottom)/9;
-        
-        window.line(this.windowWidth/2-35, pBottom, this.windowWidth/2-45, p1);
-        window.line(this.windowWidth/2-45, p1, this.windowWidth/2-25, p2);
-        window.line(this.windowWidth/2-25, p2, this.windowWidth/2-45, p3);
-        window.line(this.windowWidth/2-45, p3, this.windowWidth/2-25, p4);
-        window.line(this.windowWidth/2-25, p4, this.windowWidth/2-45, p5);
-        window.line(this.windowWidth/2-45, p5, this.windowWidth/2-25, p6);
-        window.line(this.windowWidth/2-25, p6, this.windowWidth/2-45, p7);
-        window.line(this.windowWidth/2-45, p7, this.windowWidth/2-25, p8);
-        window.line(this.windowWidth/2-25, p8, this.windowWidth/2-35, pUp);
+        if( pUp < pBottom ) {
+
+            var p1 = pBottom - Math.abs(pUp - pBottom)/9;
+            var p2 = p1 - Math.abs(pUp - pBottom)/9;
+            var p3 = p2 - Math.abs(pUp - pBottom)/9;
+            var p4 = p3 - Math.abs(pUp - pBottom)/9;
+            var p5 = p4 - Math.abs(pUp - pBottom)/9;
+            var p6 = p5 - Math.abs(pUp - pBottom)/9;
+            var p7 = p6 - Math.abs(pUp - pBottom)/9;
+            var p8 = p7 - Math.abs(pUp - pBottom)/9;
+            
+            window.line(this.windowWidth/2-35, pBottom, this.windowWidth/2-45, p1);
+            window.line(this.windowWidth/2-45, p1, this.windowWidth/2-25, p2);
+            window.line(this.windowWidth/2-25, p2, this.windowWidth/2-45, p3);
+            window.line(this.windowWidth/2-45, p3, this.windowWidth/2-25, p4);
+            window.line(this.windowWidth/2-25, p4, this.windowWidth/2-45, p5);
+            window.line(this.windowWidth/2-45, p5, this.windowWidth/2-25, p6);
+            window.line(this.windowWidth/2-25, p6, this.windowWidth/2-45, p7);
+            window.line(this.windowWidth/2-45, p7, this.windowWidth/2-25, p8);
+            window.line(this.windowWidth/2-25, p8, this.windowWidth/2-35, pUp);
+        }
+
     }
 
     drawPassive( counter ) {
@@ -818,22 +829,29 @@ class DrawHelper {
 
         const suspensionOffset = this.suspensionOffset();
 
+        var minPart = this.controller.getActiveTyre(counter-this.halfWidth) - 50
+        var tSuspensionY = this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 125
+        tSuspensionY = ( tSuspensionY < minPart ) ? tSuspensionY : minPart
+
         window.line(this.windowWidth/2+35, this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 25, 
-                    this.windowWidth/2+35, this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 125 );
-        window.line(this.windowWidth/2+25, this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 125, 
-                    this.windowWidth/2+45, this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 125 );
+                    this.windowWidth/2+35, tSuspensionY );
+        window.line(this.windowWidth/2+25, tSuspensionY, 
+                    this.windowWidth/2+45, tSuspensionY );
     }
 
     drawActiveBottomSuspension( counter ) {
 
         const tyreOffset = this.tyreOffset();
 
+        var maxPart = this.controller.getActiveSuspension(counter-this.halfWidth) + this.suspensionOffset() + 25
+        var bSuspensionY = this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset - 225
+        bSuspensionY = ( bSuspensionY > maxPart ) ? bSuspensionY : maxPart
+
         window.line(this.windowWidth/2+25, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset, 
-                    this.windowWidth/2+25, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset - 125 );
+                    this.windowWidth/2+25, bSuspensionY );
         window.line(this.windowWidth/2+45, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset, 
-                    this.windowWidth/2+45, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset - 125 );
-        // window.stroke(0);
-        // window.fill(0);
+                    this.windowWidth/2+45, bSuspensionY );
+
         window.rectMode(window.CORNER);
         window.rect(this.windowWidth/2+25, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset, 20, -10);
     }
@@ -848,28 +866,31 @@ class DrawHelper {
                     this.windowWidth/2-35, this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 75 );
         window.line(this.windowWidth/2-35, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset, 
                     this.windowWidth/2-35, this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset - 50 );
-        
+
         var pUp     = this.controller.getActiveSuspension(counter-this.halfWidth) + suspensionOffset + 75;
         var pBottom = this.controller.getActiveTyre(counter-this.halfWidth) + tyreOffset - 50;
         
-        var p1 = pBottom - Math.abs(pUp - pBottom)/9;
-        var p2 = p1 - Math.abs(pUp - pBottom)/9;
-        var p3 = p2 - Math.abs(pUp - pBottom)/9;
-        var p4 = p3 - Math.abs(pUp - pBottom)/9;
-        var p5 = p4 - Math.abs(pUp - pBottom)/9;
-        var p6 = p5 - Math.abs(pUp - pBottom)/9;
-        var p7 = p6 - Math.abs(pUp - pBottom)/9;
-        var p8 = p7 - Math.abs(pUp - pBottom)/9;
-        
-        window.line(this.windowWidth/2-35, pBottom, this.windowWidth/2-45, p1);
-        window.line(this.windowWidth/2-45, p1, this.windowWidth/2-25, p2);
-        window.line(this.windowWidth/2-25, p2, this.windowWidth/2-45, p3);
-        window.line(this.windowWidth/2-45, p3, this.windowWidth/2-25, p4);
-        window.line(this.windowWidth/2-25, p4, this.windowWidth/2-45, p5);
-        window.line(this.windowWidth/2-45, p5, this.windowWidth/2-25, p6);
-        window.line(this.windowWidth/2-25, p6, this.windowWidth/2-45, p7);
-        window.line(this.windowWidth/2-45, p7, this.windowWidth/2-25, p8);
-        window.line(this.windowWidth/2-25, p8, this.windowWidth/2-35, pUp);
+        if( pUp < pBottom ) {
+            
+            var p1 = pBottom - Math.abs(pUp - pBottom)/9;
+            var p2 = p1 - Math.abs(pUp - pBottom)/9;
+            var p3 = p2 - Math.abs(pUp - pBottom)/9;
+            var p4 = p3 - Math.abs(pUp - pBottom)/9;
+            var p5 = p4 - Math.abs(pUp - pBottom)/9;
+            var p6 = p5 - Math.abs(pUp - pBottom)/9;
+            var p7 = p6 - Math.abs(pUp - pBottom)/9;
+            var p8 = p7 - Math.abs(pUp - pBottom)/9;
+            
+            window.line(this.windowWidth/2-35, pBottom, this.windowWidth/2-45, p1);
+            window.line(this.windowWidth/2-45, p1, this.windowWidth/2-25, p2);
+            window.line(this.windowWidth/2-25, p2, this.windowWidth/2-45, p3);
+            window.line(this.windowWidth/2-45, p3, this.windowWidth/2-25, p4);
+            window.line(this.windowWidth/2-25, p4, this.windowWidth/2-45, p5);
+            window.line(this.windowWidth/2-45, p5, this.windowWidth/2-25, p6);
+            window.line(this.windowWidth/2-25, p6, this.windowWidth/2-45, p7);
+            window.line(this.windowWidth/2-45, p7, this.windowWidth/2-25, p8);
+            window.line(this.windowWidth/2-25, p8, this.windowWidth/2-35, pUp);
+        }
     }
 
 
