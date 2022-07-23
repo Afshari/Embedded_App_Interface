@@ -2,8 +2,8 @@ const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
 const  fs = require('fs')
 const  net = require('net')
-const  SerialPort = require('serialport');
-const  ByteLength = require('@serialport/parser-byte-length');
+// const  SerialPort = require('serialport');
+// const  ByteLength = require('@serialport/parser-byte-length');
 
 
 let mainWindow;

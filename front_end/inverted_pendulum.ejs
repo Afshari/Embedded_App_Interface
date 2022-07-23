@@ -55,7 +55,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="192.168.1.23">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
                 </div>
             </div>
         </div>
@@ -64,7 +64,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5555">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
                 </div>
             </div>
         </div>
@@ -102,6 +102,11 @@
 // var fileIndex = 0;
 // var fileNames = [ 'xe-4', 'xe-3', 'xe-2', 'xe-1' ];
 
+// [ ] - Add Request to MainIPC to get data
+// [ ] - Get Data from MainIPC and Print to Console
+// [ ] - Draw Received Data on Screen
+
+
 const { Matrix } = require('ml-matrix');
 
 const { InvertedPendulum, HandleWorkFlow } = require('../classes/cls_inverted_pendulum');
@@ -130,7 +135,7 @@ const halfWidth     = windowWidth / 2;
 
 // const drawHelper = new DrawHelper( controller, windowWidth );
 
-var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth );
+var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage );
 
 $(document).ready( () => {
 
@@ -139,20 +144,12 @@ $(document).ready( () => {
     });
     $("#btnReset").click( () => {
         
-        if(handleWorkFlow.isStateDrawing() || handleWorkFlow.isStateFinish()) {
-            handleWorkFlow.state2Ready();
-            handleWorkFlow.counter_remote = -40
-            handleWorkFlow.isReadyToDraw = false
-            var angle = $('#angle_range').val();
-            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
-            drawBackground();
-            drawCart(x0.get(0, 0), x0.get(2, 0))
-        }
+        var angle = $('#angle_range').val();
+        x0 = handleWorkFlow.handleReset(x0, angle, drawBackground, drawCart)
     });
 
     $("#btnReplay").click( () => {
         handleWorkFlow.handleReplay()
-        // handleWorkFlow.counter_remote = -40;
     });
 
     $("#btnRun").click( () => {
@@ -160,12 +157,8 @@ $(document).ready( () => {
     });
     $(document).on('input', '#angle_range', function() {
 
-        if(handleWorkFlow.isStateStart() || handleWorkFlow.isStateReady()) {
-            var angle = $(this).val();
-            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
-            drawBackground();
-            drawCart(x0.get(0, 0), x0.get(2, 0))
-        }
+        var angle = $(this).val();
+        x0 = handleWorkFlow.handleAngle(x0, angle, drawBackground, drawCart)
     });
 
 } );
@@ -185,11 +178,6 @@ const mr = 0.3  * Math.sqrt(m)   * draw_scale;        // mass radius
 
 const y = wr / 2 + H / 2;               // cart vertical position
 
-
-ipcRenderer.on('inverted_pendulum:get:values', (event, values, isFinished) => {
-
-    handleWorkFlow.handleReceivedValues( values, isFinished )
-})
 
 
 function drawBackground() {
@@ -240,18 +228,9 @@ function drawCart( x, th ) {
 function draw() {
 
 
- 
-    // if(handleWorkFlow.isReadyToDraw == true) {
-    if(handleWorkFlow.isStateDrawing()) {
+    if(handleWorkFlow.isDrawing() == true) {
 
         drawBackground();
-
-        // var x  = inverted_pendulum.y[counter].get(0, 0)  * draw_scale;
-        // var th = inverted_pendulum.y[counter].get(2, 0);
-        // drawCart( x, th )
-
-        // if(counter < inverted_pendulum.y.length - 40)
-        //     counter += 40;
 
         var curr_counter_remote = ( handleWorkFlow.counter_remote < 0 ) ? 0 : handleWorkFlow.counter_remote;
 
@@ -262,8 +241,7 @@ function draw() {
         if(handleWorkFlow.counter_remote < inverted_pendulum.y_remote.length - 1)
             handleWorkFlow.counter_remote += 1;
         else
-            handleWorkFlow.state2Finish();
-
+            handleWorkFlow.finishDraw();
     }
 }
 

@@ -30,7 +30,6 @@
     "mathjax": "^3.1.2",
     "mathjax-electron": "^3.0.0",
     "ml-matrix": "^6.7.0",
-    "serialport": "^9.0.7",
     "stats-js": "^1.0.1",
     "three": "^0.129.0"
   }

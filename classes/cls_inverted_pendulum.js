@@ -2,17 +2,75 @@
 const THREE = require('three');
 const { Matrix } = require('ml-matrix');
 
+// [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
+// [ ] - Show Error Message with Modal
+
+
 
 var Enum = require('enum');
 
-var State = new Enum( {
-    'start': 1,
-    'ready': 2,
-    'sending_data': 3,
-    'data_ready': 3,
-    'drawing': 4,
-    'finish': 5
-})
+let State = Object.freeze({
+    NotConnected:                   'Not Connected',
+    Connecting:                     'Connecting',
+    Connected:                      'Connected',
+    ConnectionCheck:                'Connection Check',
+    Ready:                          'Ready to Run',
+    Running:                        'Running',
+    Drawing:                        'Drawing',
+    DrawFinished:                   'Draw Finished',
+});
+
+let Trigger = Object.freeze({
+    Connect:                        'Connect',
+    ConnectionFail:                 'ConnectionFail',
+    ConnectionPass:                 'ConnectionPass',
+    ConnectionTest:                 'ConnectionTest',
+    SendData:                       'SendData',
+    ComputationCompleted:           'ComputationCompleted',
+    Draw:                           'Draw',
+    DrawEnd:                        'DrawEnd',
+    Replay:                         'Replay',
+    Reset:                          'Reset',
+    Disconnect:                     'Disconnect',
+});
+
+
+
+let rules = {};
+rules[State.NotConnected] = {
+    Connect:  State.Connecting
+};
+rules[State.Connecting] = {
+    ConnectionFail:     State.NotConnected,
+    ConnectionPass:     State.Connected
+};
+rules[State.Connected] = {
+    SendData:           State.Running,
+    ConnectionFail:     State.NotConnected
+};
+rules[State.Ready] = {
+    SendData:           State.Running,
+    ConnectionFail:     State.NotConnected
+};
+rules[State.Running] = {
+    ComputationCompleted:   State.Drawing,
+    ConnectionFail:         State.NotConnected
+};
+rules[State.Drawing] = {
+    Reset:              State.Ready,
+    DrawEnd:            State.DrawFinished,
+    ConnectionFail:     State.Drawing
+};
+rules[State.DrawFinished] = {
+    Replay:             State.Drawing,
+    Reset:              State.Ready,
+    ConnectionFail:     State.DrawFinished,
+    ConnectionTest:     State.ConnectionCheck
+};
+rules[State.ConnectionCheck] = {
+    ConnectionFail:     State.NotConnected,
+    ConnectionPass:     State.Ready
+};
 
 
 // This class is just for Testing Algorithm
@@ -92,80 +150,130 @@ class InvertedPendulum {
 
 class HandleWorkFlow {
 
-    constructor( inverted_pendulum, ipcRenderer, windowWidth ) {
+    constructor( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage ) {
 
-        this.state              =   State.start;
+        this.state              =   State.NotConnected;
         this.inverted_pendulum  =   inverted_pendulum;
         this.ipcRenderer        =   ipcRenderer;
         this.windowWidth        =   windowWidth;
+        this.showFlashMessage   =   showFlashMessage;
 
         this.isReadyToDraw      = false;
         this.counter_remote     = -40
+
+        this.ipcRenderer.on('inverted_pendulum:connection:fail', (event, values) => {
+            this.state = rules[this.state][Trigger.ConnectionFail]
+            console.log(this.state)
+            this.showFlashMessage("Connection Lost", "ERROR")
+        });
+        this.ipcRenderer.on('inverted_pendulum:connection:pass', (event, values) => {
+            this.state = rules[this.state][Trigger.ConnectionPass]
+            console.log(this.state)
+            this.showFlashMessage("Successfully Connected to the Server", "INFO")
+        });
+        this.ipcRenderer.on('inverted_pendulum:get:values', (event, values, isFinished) => {
+
+            this.handleReceivedValues( values, isFinished )
+        });
     }
 
     handleConnect(ip, port) {
-        if( this.isStateStart() ) {
+
+        if(this.state == State.NotConnected) {
+            this.state = rules[this.state][Trigger.Connect]
+            console.log(this.state)
             this.ipcRenderer.send('inverted_pendulum:connect', ip, port);
-            this.state2Ready()
+        } else {
+            this.showFlashMessage("Already Connected", "WARNING")
         }
     }
 
     handleRun( ref_pos, x0, n_, h_ ) {
 
-        if( this.isStateReady() ) {
+        if(this.state == State.Ready || this.state == State.Connected) {
 
-            this.state2SendingData();
+            this.state = rules[this.state][Trigger.SendData]
+            console.log(this.state)
             this.inverted_pendulum.y_remote = []
             this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 111, ref_pos.data, x0.data, n_, h_ );
 
+        } else if(this.state == State.NotConnected) {
+            this.showFlashMessage("Doesn't Connect to the Server", "WARNING")
+        } else if(this.state == State.Running || this.state == State.Drawing) {
+            this.showFlashMessage("Already Running", "WARNING")
+        } else if(this.state == State.DrawFinished) {
+            this.showFlashMessage("First you should 'Reset' before Running Again", "WARNING")
         }
     }
 
     handleReplay() {
-        if(this.isStateDrawing() || this.isStateFinish()) {
-            this.state2Drawing()
+        
+        if(this.state == State.DrawFinished) {
+            this.state = rules[this.state][Trigger.Replay]
+            console.log(this.state)
             this.counter_remote = -40
+        } else {
+            this.showFlashMessage("Action is Not Possible", "WARNING")
         }
     }
 
-    handleReset() {
-        
+    handleReset(x0, angle, drawBackground, drawCart) {
+            
+        if(this.state == State.Drawing || this.state == State.DrawFinished) {
+            
+            this.state = rules[this.state][Trigger.Reset]
+            console.log(this.state)
+
+            this.counter_remote = -40
+            this.isReadyToDraw = false
+            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
+            drawBackground();
+            drawCart(x0.get(0, 0), x0.get(2, 0))
+        }
+        return x0;
+    }
+
+    handleAngle(x0, angle, drawBackground, drawCart) {
+
+        if(this.state == State.Connected || this.state == State.Ready || this.state == State.NotConnected) {
+
+            x0 = new Matrix( [ [0, 0, Math.PI - (angle/100), 0] ] ).transpose()
+            drawBackground();
+            drawCart(x0.get(0, 0), x0.get(2, 0))
+        }
+        return x0;
     }
 
     handleReceivedValues( values, isFinished ) {
 
-        if(isFinished == true) {
+        if(this.state == State.Running) {
 
-            this.counter_remote = -40
-            this.isReadyToDraw = true
-            this.state2Drawing()
+            if(isFinished == true) {
 
-        } else {
-            values = values.split(';')
-            for(var i = 0; i < values.length; i++) {
-                var arr = values[i].split(',')
-                this.inverted_pendulum.y_remote.push( [ parseFloat(arr[0]), parseFloat(arr[1]) ] )
+                this.counter_remote = -40
+                this.isReadyToDraw = true
+                this.state = rules[this.state][Trigger.ComputationCompleted]
+                console.log(this.state)
+                // this.state2Drawing()
+
+            } else {
+                values = values.split(';')
+                for(var i = 0; i < values.length; i++) {
+                    var arr = values[i].split(',')
+                    this.inverted_pendulum.y_remote.push( [ parseFloat(arr[0]), parseFloat(arr[1]) ] )
+                }
+                this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 112)
             }
-            this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 112)
         }
     }
 
-    isStateStart() { return this.state == State.start; }
-    isStateReady() { return this.state == State.ready; }
-    isStateSendingData() { return this.state == State.sending_data; }
-    isStateDataReady() { return this.state == State.data_ready; }
-    isStateDrawing() { return this.state == State.drawing; }
-    isStateFinish() { return this.state == State.finish; }
-
-
-    // Transition to New State
-    state2Start() { this.state = State.start; }
-    state2Ready() { this.state = State.ready; }
-    state2SendingData() { this.state = State.sending_data; }
-    state2DataReady() { this.state = State.data_ready; }
-    state2Drawing() { this.state = State.drawing; }
-    state2Finish() { this.state = State.finish; }
-
+    isDrawing() { return this.state == State.Drawing; }
+    isConnected() { return this.state == State.Connected;}
+    isReady() { return this.state == State.Ready; }
+    finishDraw() { 
+        this.state = rules[this.state][Trigger.DrawEnd];
+        console.log(this.state)
+    }
 }
 
 
@@ -347,9 +455,7 @@ class DrawHelper {
         this.drawActiveBottomSuspension( counter );
         this.drawActiveTopSuspension( counter );
         this.drawActiveDamper( counter );
-
     }
-
 }
 
 

@@ -1,19 +1,25 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
 const contextMenu = require('electron-context-menu');
-const SerialPort = require('serialport');
 const fs = require('fs');
 const lineReader = require('line-reader');
 var linearAlgebra = require('linear-algebra')(),  
 					Vector = linearAlgebra.Vector,
 					Matrix = linearAlgebra.Matrix;
 
+// [✓] - Change default page 
+// [✓] - Print Inverted_Pendulum Initialization
+// [✓] - Print Each Step of Inverted_Pendulum
+// [ ] - Create StateMachine for InvertedPendulum
+// [ ] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
+// [ ] - 
+
+
 const sot = require('./sot');
 const rls = require('./rls');
-const lite_ids = require('./lite_ids');
 const a_star = require('./a_star');
 const siamfc = require('./siamfc');
-const kf_tracking = require('./kf_tracking');
+// const kf_tracking = require('./kf_tracking');
 const kf_passive_suspension = require('./kf_passive_suspension');
 const robust_suspension = require('./robust_suspension');
 const ekf_localization = require('./ekf_localization');
@@ -22,7 +28,7 @@ const detectron_tracking = require('./detectron_tracking');
 const inverted_pendulum = require('./inverted_pendulum')
 
 
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 
 let win;
@@ -32,17 +38,16 @@ var lastPage = '';
 function createWindow() {
 	win = new BrowserWindow({
 		webPreferences: {
-				enableRemoteModule: true,
+			enableRemoteModule: true,
 			nodeIntegration: true
 		}
 	})
 
 	win.maximize();
 	
-	win.loadFile('front_end/detectron_tracking.ejs');
-	lastPage = 'detectron_tracking.ejs';
-	detectron_tracking.init(win);
-
+	win.loadFile('front_end/inverted_pendulum.ejs');
+	lastPage = 'inverted_pendulum.ejs';
+	inverted_pendulum.init(win);
 }
 
 
@@ -53,10 +58,10 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	if(lastPage === 'rls.ejs')							rls.deactivate();
 	else if(lastPage == 'sot.ejs')						sot.deactivate();
 	else if(lastPage === 'detectron_tracking.ejs') 		detectron_tracking.deactivate();
-	else if(lastPage === 'lite_ids.ejs') { }
+	// else if(lastPage === 'lite_ids.ejs') { }
 	else if(lastPage === 'a_star.ejs')					a_star.deactivate();
 	else if(lastPage === 'siamfc.ejs') 					siamfc.deactivate();
-	else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
+	// else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
 	else if(lastPage === 'kf_passive_suspension.ejs')	kf_passive_suspension.deactivate();
 	else if(lastPage === 'robust_suspension.ejs')		robust_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
@@ -81,8 +86,8 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	} else if(addr === 'lite_ids.ejs') {
 
-		lite_ids.init(win);
-		win.loadFile('front_end/lite_ids.ejs');
+		// lite_ids.init(win);
+		// win.loadFile('front_end/lite_ids.ejs');
 
 	} else if(addr === 'a_star.ejs') {
 
@@ -96,8 +101,8 @@ ipcMain.on("menu:page:change", function(event, addr) {
  
 	} else if(addr === 'kf_tracking.ejs') {
 
-		kf_tracking.init(win);
-		win.loadFile('front_end/kf_tracking.ejs');
+		// kf_tracking.init(win);
+		// win.loadFile('front_end/kf_tracking.ejs');
 
 	} else if(addr === 'ekf_localization.ejs') {
 
@@ -111,8 +116,8 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	} else if(addr === 'kf_passive_suspension.ejs') {
 
-		kf_passive_suspension.init(win);
-		win.loadFile('front_end/kf_passive_suspension.ejs');
+		// kf_passive_suspension.init(win);
+		// win.loadFile('front_end/kf_passive_suspension.ejs');
 
 	} else if(addr === 'robust_suspension.ejs') {
 
@@ -130,13 +135,13 @@ ipcMain.on("menu:page:change", function(event, addr) {
 })
 
 
-ipcMain.on('uart:reload', (event) => {
+// ipcMain.on('uart:reload', (event) => {
 	
-	SerialPort.list().then(function(ports){
-		// console.log(ports)
-		event.reply('uart:data', ports);
-	});
-});
+// 	SerialPort.list().then(function(ports){
+// 		// console.log(ports)
+// 		event.reply('uart:data', ports);
+// 	});
+// });
 
 
 
@@ -146,7 +151,7 @@ app.whenReady().then(function() {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' || process.platform === 'win32') {
 	detectron_tracking.deactivate();
 	rls.deactivate();
 	sot.deactivate();

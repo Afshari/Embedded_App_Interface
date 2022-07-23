@@ -40,13 +40,32 @@ function deactivate() {
     }
 }
 
-var client = new net.Socket();
+var client;
 
 function connect(ip, port) {
+
+    client = new net.Socket();
+
+    client.on('error', function(ex) {
+        mainWindow.webContents.send('inverted_pendulum:connection:fail');
+    });
+    
     client.connect(port, ip, function() {
         _isConnected = true;
+        mainWindow.webContents.send('inverted_pendulum:connection:pass');
         console.log('Connected');
     });
+
+    client.on('data', function(data) {
+
+        data = data.toString();
+        if(data == 'finished' || data.length == 8) {
+            console.log('finished')
+            mainWindow.webContents.send('inverted_pendulum:get:values', [], true );
+        } else {
+            mainWindow.webContents.send('inverted_pendulum:get:values', data, false );
+        }
+    });    
 }
 
 ipcMain.on('inverted_pendulum:connect', (event, ip, port) => {
@@ -78,24 +97,4 @@ ipcMain.on('inverted_pendulum:tcp:send:state', (event, code, wr, y0, n, h) => {
         client.write(dataStr)
     }
 })
-
-
-
-
-client.on('data', function(data) {
-
-    data = data.toString();
-    if(data == 'finished' || data.length == 8) {
-        console.log(data)
-        console.log('finished')
-        mainWindow.webContents.send('inverted_pendulum:get:values', [], true );
-    } else {
-        console.log(data.length)
-        // console.log(data)
-        // console.log('---------------------')    
-        mainWindow.webContents.send('inverted_pendulum:get:values', data, false );
-    }
-    
-});
-
 
