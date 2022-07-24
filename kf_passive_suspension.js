@@ -2,8 +2,6 @@ const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
 const  fs = require('fs')
 const  net = require('net')
-// const  SerialPort = require('serialport');
-// const  ByteLength = require('@serialport/parser-byte-length');
 
 
 let mainWindow;
@@ -47,13 +45,31 @@ function deactivate() {
     }
 }
 
-var client = new net.Socket();
+var client;
 
 function connect(ip, port) {
-    // client.connect(SERVER_PORT, SERVER_IP, function() {
+    
+    client = new net.Socket();
+
+    client.on('error', function(ex) {
+        mainWindow.webContents.send('estimating_passive_suspension:connection:fail');
+    });
+
     client.connect(port, ip, function() {
         _isConnected = true;
+        mainWindow.webContents.send('estimating_passive_suspension:connection:pass');
         console.log('Connected');
+    });
+
+    client.on('data', function(data) {
+
+        data = data.toString();
+        mainWindow.webContents.send('estimating_passive_suspension:get:values', data);
+    });
+    
+    client.on('close', function() {
+        _isConnected = false;
+        console.log('Connection closed');
     });
 }
 
@@ -83,18 +99,7 @@ ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, data, 
     client.write(dataStr)
 })
 
-client.on('data', function(data) {
 
-    data = data.toString();
-    mainWindow.webContents.send('estimating_passive_suspension:get:values', data );
-    // console.log(data);
-});
-
-
-client.on('close', function() {
-    _isConnected = false;
-	console.log('Connection closed');
-});
 
 function sendCommandUart(data) {
 

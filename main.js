@@ -116,8 +116,8 @@ ipcMain.on("menu:page:change", function(event, addr) {
 
 	} else if(addr === 'kf_passive_suspension.ejs') {
 
-		// kf_passive_suspension.init(win);
-		// win.loadFile('front_end/kf_passive_suspension.ejs');
+		kf_passive_suspension.init(win);
+		win.loadFile('front_end/kf_passive_suspension.ejs');
 
 	} else if(addr === 'robust_suspension.ejs') {
 

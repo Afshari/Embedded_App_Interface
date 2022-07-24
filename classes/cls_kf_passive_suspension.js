@@ -1,19 +1,91 @@
 
-var linearAlgebra = require('linear-algebra')(),     // initialise it
+var linearAlgebra = require('linear-algebra')(),
                     Vector = linearAlgebra.Vector,
                     Matrix = linearAlgebra.Matrix;
 
 var Enum = require('enum');
 
+// [ ] - Remove Uart Elements
+// [ ] - Create States
+// [ ] - Create Triggers
+// [ ] - Create Rules
 
-var State = new Enum( { 
+let State = Object.freeze({
+    NotConnected:                   'Disconnect',
+    Connecting:                     'Connecting',
+    Connected:                      'Connected',
+    Ready:                          'Ready to Run',
+    Running:                        'Calculating',
+    Drawing:                        'Visualizing Result',
+    DrawFinished:                   'Visualization Finished',
+    Pause:                          'Paused',
+});
 
-    'ready': 1,
-    'sendingMeasurements': 2,
-    'running': 3,
-    'pause': 4,
-    'finish': 5
-})
+let Trigger = Object.freeze({
+    Connect:                        'Connect',
+    ConnectionFail:                 'ConnectionFail',
+    ConnectionPass:                 'ConnectionPass',
+    SendData:                       'SendData',
+    ComputationCompleted:           'ComputationCompleted',
+    Draw:                           'Draw',
+    DrawEnd:                        'DrawEnd',
+    Replay:                         'Replay',
+    Reset:                          'Reset',
+    Resume:                         'Resume',
+    Pause:                          'Pause'
+});
+
+let rules = {};
+rules[State.NotConnected] = {
+    Connect:            State.Connecting
+};
+rules[State.Connecting] = {
+    ConnectionFail:     State.NotConnected,
+    ConnectionPass:     State.Connected
+};
+rules[State.Connected] = {
+    SendData:           State.Running,
+    ConnectionFail:     State.NotConnected
+};
+rules[State.Ready] = {
+    SendData:           State.Running,
+    ConnectionFail:     State.NotConnected
+};
+rules[State.Running] = {
+    Pause:                  State.Running,
+    ComputationCompleted:   State.Drawing,
+    ConnectionFail:         State.NotConnected
+};
+rules[State.Drawing] = {
+    Reset:                  State.Ready,
+    DrawEnd:                State.DrawFinished,
+    Pause:                  State.Pause,
+    Replay:                 State.Drawing,
+    ConnectionFail:         State.Drawing
+};
+rules[State.Pause] = {
+    Resume:                 State.Drawing,
+    Reset:                  State.Ready,
+    ConnectionFail:         State.Pause
+};
+rules[State.DrawFinished] = {
+    Replay:                 State.Drawing,
+    Reset:                  State.Ready,
+    ConnectionFail:         State.DrawFinished,
+};
+rules[State.ConnectionCheck] = {
+    ConnectionFail:         State.NotConnected,
+    ConnectionPass:         State.Ready
+}
+
+// var State = new Enum( { 
+
+//     'ready': 1,
+//     'sendingMeasurements': 2,
+//     'running': 3,
+//     'pause': 4,
+//     'finish': 5
+// })
 
 
 class SuspensionEstimator {
@@ -119,127 +191,208 @@ class SuspensionEstimator {
 
 class HandleWorkFlow {
 
-    constructor( estimator, ipcRenderer, windowWidth ) {
+    constructor(estimator, ipcRenderer, windowWidth, showFlashMessage, setWorkflow) {
 
-        this.state = State.ready;
-        this.estimator = estimator;
-        this.ipcRenderer = ipcRenderer;
-        this.windowWidth = windowWidth;
-        this.counter = windowWidth;
-        // this.rnd = 1;
+        this.state              = State.NotConnected;
+        this.estimator          = estimator;
+        this.ipcRenderer        = ipcRenderer;
+        this.windowWidth        = windowWidth;
+        this.counter            = windowWidth;
+        this.showFlashMessage   = showFlashMessage;
+        this.setWorkflow        = setWorkflow;
         this.rnd = 0;
-        this.connection_type = "";
-        this.uart = "";
+        // this.connection_type = "";
+        // this.uart = "";
 
+        this.ipcRenderer.on('estimating_passive_suspension:connection:fail', (event, values) => {
+            this.state = rules[this.state][Trigger.ConnectionFail]
+            this.setWorkflow(this.state)
+            this.showFlashMessage("Connection Lost", "ERROR")
+        });
+        this.ipcRenderer.on('estimating_passive_suspension:connection:pass', (event, values) => {
+            this.state = rules[this.state][Trigger.ConnectionPass]
+            this.setWorkflow(this.state)
+            this.showFlashMessage("Successfully Connected to the Server", "INFO")
+        });
+        this.ipcRenderer.on('estimating_passive_suspension:get:values', (event, values) => {
+
+            values = values.split(';');
+            this.handleReceivedValues(values);
+        });
     }
 
     handleConnect(ip, port) {
-        this.ipcRenderer.send('estimating_passive_suspension:connect', ip, port);
-    }
 
-    handleStep() {
-
-        if( this.isStatePause() ) {
-
-            if( this.counter < this.estimator.n - 15 )
-                this.counter += 15;
-        } else if( this.isStateRunning() ) {
-            
-            window.showFlashMessage( "Algorithm is Running", "WARNING" )
+        if(this.state == State.NotConnected) {
+            this.state = rules[this.state][Trigger.Connect]
+            this.setWorkflow(this.state)
+            this.ipcRenderer.send('estimating_passive_suspension:connect', ip, port);
+        } else {
+            this.showFlashMessage("Already Connected", "WARNING")
         }
     }
+
+    handleReplay(counter) {
+
+        if(this.state == State.Drawing) {
+            console.log(this.state)
+            this.state = rules[this.state][Trigger.Replay]
+            console.log(this.state)
+            this.setWorkflow(this.state)
+            return this.windowWidth;
+        } else if(this.state == State.DrawFinished) {
+            this.state = rules[this.state][Trigger.Replay]
+            this.setWorkflow(this.state)
+            return this.windowWidth;
+        }
+        this.showFlashMessage("Action is Not Possible", "WARNING")
+        return counter;
+    }
+
+    // handleStep() {
+
+    //     if( this.isStatePause() ) {
+
+    //         if( this.counter < this.estimator.n - 15 )
+    //             this.counter += 15;
+    //     } else if( this.isStateRunning() ) {
+            
+    //         window.showFlashMessage( "Algorithm is Running", "WARNING" )
+    //     }
+    // }
 
     handlePause() {
 
-        if( this.isStateRunning() ) {
-            
-            this.state2Pause();
+        if(this.state == State.Drawing) {
+            this.state = rules[this.state][Trigger.Pause];
             window.frameRate(4);
+            this.setWorkflow(this.state);
+        } else if(this.state == State.Pause) {
+            this.state = rules[this.state][Trigger.Resume];
+            window.frameRate(40);
+            this.setWorkflow(this.state);
         }
+        // if( this.isStateRunning() ) {
+            
+        //     this.state2Pause();
+        //     window.frameRate(4);
+        // }
     }
 
-    handleRun( c_type, c_uart, tm ) {
+    handleRun(tm, counter) {
 
-        if( this.isStateReady() ) {
+        if(this.state == State.Ready || this.state == State.Connected) {
 
-            this.state2SendingMeasurements();
-            this.connection_type = c_type;
-            this.uart = c_uart;
-            this.estimator.init( parseInt(tm) )
-
-            if(this.connection_type === "tcp")
-                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-            else if(this.connection_type === "uart")
-                this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-
-        } else if( this.isStatePause() ) {
-
-            this.state2Running();
-            window.frameRate(40);
+            this.state = rules[this.state][Trigger.SendData]
+            this.setWorkflow(this.state)
+            this.estimator.init(parseInt(tm))
+            this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
+            return this.windowWidth;
+            
+        } else if(this.state == State.NotConnected) {
+            this.showFlashMessage("Doesn't Connect to the Server", "WARNING")
+        } else if(this.state == State.Running || this.state == State.Drawing) {
+            this.showFlashMessage("Already Running", "WARNING")
+            this.showFlashMessage("If You want to Run with different Parameters, First Reset", "INFO")
+        } else if(this.state == State.DrawFinished) {
+            this.showFlashMessage("First you should 'Reset' before Running Again", "WARNING")
         }
+        return counter;
+
+        // if( this.isStateReady() ) {
+
+        //     this.state2SendingMeasurements();
+        //     this.connection_type = c_type;
+        //     this.uart = c_uart;
+        //     this.estimator.init( parseInt(tm) )
+
+        //     if(this.connection_type === "tcp")
+        //         this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
+        //     else if(this.connection_type === "uart")
+        //         this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
+
+        // } else if( this.isStatePause() ) {
+
+        //     this.state2Running();
+        //     window.frameRate(40);
+        // }
     }
 
     handleReset() {
 
+        if(this.state == State.Drawing || this.state == State.DrawFinished || this.state == State.Pause) {
+            
+            this.state = rules[this.state][Trigger.Reset]
+            this.setWorkflow(this.state)
+        }
     }
 
-    handleReceivedValues( values ) {
+    handleReceivedValues(values) {
 
-        console.log(values)
-        // console.log("rnd ", this.rnd)
-        // console.log(this.isStateSendingMeasurements())
-        // if(this.rnd <= this.estimator.Tf && this.isStateSendingMeasurements() ) {
-        if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
+        // if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
+        if(this.rnd <= (this.estimator.n - 1) && this.state == State.Running) {
 
             for(var i = 0; i < values.length; i++) {    
-                if(this.connection_type === "tcp") {
-                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
-                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
-                } else if(this.connection_type === "uart") {
-                    this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i] ) );
-                    this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i] ) );
-                }
+                // if(this.connection_type === "tcp") {
+                this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
+                this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
+                // } else if(this.connection_type === "uart") {
+                //     this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i] ) );
+                //     this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i] ) );
+                // }
             }
             
-            console.log("rnd ", this.rnd)
+            // console.log("rnd ", this.rnd)
             if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
-                if(this.connection_type === "tcp") {
-                    this.rnd += this.estimator.ITEM_PER_STEP;
-                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-                } else if(this.connection_type === "uart") {
-                    this.rnd += this.estimator.ITEM_PER_STEP;
-                    this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-                }
+                // if(this.connection_type === "tcp") {
+                this.rnd += this.estimator.ITEM_PER_STEP;
+                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
+                // } else if(this.connection_type === "uart") {
+                //     this.rnd += this.estimator.ITEM_PER_STEP;
+                //     this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
+                // }
 
 
                 // this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
             } else {
     
-                this.state2Running();
+                this.state = rules[this.state][Trigger.ComputationCompleted]
+                this.setWorkflow(this.state)
+                // this.state2Running();
                 window.frameRate(40);
             }
         } 
     }
 
 
-    isStateReady() { return this.state == State.ready; }
+    isDrawing() { return this.state == State.Drawing; }
 
-    isStateSendingMeasurements() { return this.state == State.sendingMeasurements; }
+    finishDraw() {
+        if(this.state == State.Drawing) {
+            this.state = rules[this.state][Trigger.DrawEnd];
+            this.setWorkflow(this.state);
+        }
+    }
 
-    isStateRunning() { return this.state == State.running; }
 
-    isStatePause() { return this.state == State.pause; }
+    // isStateReady() { return this.state == State.ready; }
 
-    isStateFinish() { return this.state == State.finish; }
+    // isStateSendingMeasurements() { return this.state == State.sendingMeasurements; }
 
-    state2Pause() { this.state = State.pause; }
+    // isStateRunning() { return this.state == State.running; }
 
-    state2Running() { this.state = State.running; }
+    // isStatePause() { return this.state == State.pause; }
 
-    state2SendingMeasurements() { this.state = State.sendingMeasurements; }
+    // isStateFinish() { return this.state == State.finish; }
 
-    state2Finish() { this.state = State.finish; }
+    // state2Pause() { this.state = State.pause; }
+
+    // state2Running() { this.state = State.running; }
+
+    // state2SendingMeasurements() { this.state = State.sendingMeasurements; }
+
+    // state2Finish() { this.state = State.finish; }
 
 
 }
@@ -318,8 +471,6 @@ class DrawHelper {
         window.line(this.windowWidth/2-45, p7, this.windowWidth/2-25, p8);
         window.line(this.windowWidth/2-25, p8, this.windowWidth/2-35, pUp);
     }
-
-
 }
 
 

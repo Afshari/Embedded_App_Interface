@@ -14,7 +14,7 @@
             </div>
         </div>
 
-        <div class="row mt">
+        <!-- <div class="row mt">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -24,9 +24,9 @@
                     </select>
                 </div>
             </div>
-        </div>
+        </div> -->
 
-        <div class="row mt" id="ip_div_id" style="display: none;">
+        <div class="row mt" id="ip_div_id">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -35,7 +35,7 @@
             </div>
         </div>
 
-        <div class="row mt" id="port_div_id" style="display: none;">
+        <div class="row mt" id="port_div_id">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <div class="row mt" id="uart_div_id">
+        <!-- <div class="row mt" id="uart_div_id">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -53,7 +53,7 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
-        </div>
+        </div> -->
 
         </div>
         <!-- /form-panel -->
@@ -63,10 +63,13 @@
 
 <div style="margin: 5px;">
     <button type="button" class="btn btn-info"   id="btnConnect">Connect</button>
-    <button type="button" class="btn btn-warning" id="btnPause">Pause</button>
-    <button type="button" class="btn btn-theme" id="btnStep">Step</button>
+    <button type="button" class="btn btn-theme" id="btnPause">Pause/Play</button>
+    <button type="button" class="btn btn-theme" id="btnReplay">Replay</button>
     <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme" id="btnReset">Reset</button>
+</div>
+<div style="margin: 5px;">
+    <div class="alert alert-success"><b id="workflow">Disconnect</b></div>
 </div>
 
 
@@ -78,8 +81,11 @@
 
 <script type="text/javascript">
 
+function setWorkflow(txt) {
+    $("#workflow").text(txt)
+}
 
-var linearAlgebra = require('linear-algebra')(),     // Initialise it
+var linearAlgebra = require('linear-algebra')(),
                     Vector = linearAlgebra.Vector,
                     Matrix = linearAlgebra.Matrix;
 
@@ -95,37 +101,37 @@ var estimator = new SuspensionEstimator();
 // estimator.init();
 const drawHelper = new DrawHelper( estimator, windowWidth );
 
-var handleWorkFlow = new HandleWorkFlow( estimator, ipcRenderer, windowWidth );
+var handleWorkFlow = new HandleWorkFlow(estimator, ipcRenderer, windowWidth, showFlashMessage, setWorkflow);
 // console.log( handleWorkFlow );
 
 
 $(document).ready( () => {
 
-    ipcRenderer.send('uart:reload');
+    // ipcRenderer.send('uart:reload');
 
-    $('#connection_type').on('change', function() {
-        if( $("#connection_type").val() == "uart" ) {
-            $('#ip_div_id').hide();
-            $('#port_div_id').hide();
-            $('#uart_div_id').show();
-        } else if( $("#connection_type").val() == "tcp" ) {
-            $('#ip_div_id').show();
-            $('#port_div_id').show();
-            $('#uart_div_id').hide();
-        }
-    });
+    // $('#connection_type').on('change', function() {
+    //     if( $("#connection_type").val() == "uart" ) {
+    //         $('#ip_div_id').hide();
+    //         $('#port_div_id').hide();
+    //         $('#uart_div_id').show();
+    //     } else if( $("#connection_type").val() == "tcp" ) {
+    //         $('#ip_div_id').show();
+    //         $('#port_div_id').show();
+    //         $('#uart_div_id').hide();
+    //     }
+    // });
 
     // Load UART on Reload Button Click
-    $("#reloadUart").click( (event) => {
-        ipcRenderer.send('uart:reload');
-    });
-    ipcRenderer.on('uart:data', (event, ports) => {
+    // $("#reloadUart").click( (event) => {
+    //     ipcRenderer.send('uart:reload');
+    // });
+    // ipcRenderer.on('uart:data', (event, ports) => {
 
-        $('#uart_select').find('option').remove();
-        ports.forEach(function(port){
-            $("#uart_select").append(new Option(port['path'], port['path']));
-        });
-    });
+    //     $('#uart_select').find('option').remove();
+    //     ports.forEach(function(port){
+    //         $("#uart_select").append(new Option(port['path'], port['path']));
+    //     });
+    // });
 
 
     $("#btnConnect").click( () => {
@@ -143,24 +149,24 @@ $(document).ready( () => {
         handleWorkFlow.handleReset();
     });
 
-    $("#btnStep").click( () => {
+    $("#btnReplay").click( () => {
 
-        handleWorkFlow.handleStep();
+        handleWorkFlow.counter = handleWorkFlow.handleReplay(handleWorkFlow.counter);
     });
 
     $("#btnRun").click( () => {
 
-        handleWorkFlow.handleRun( $("#connection_type").val(), $("#uart_select").val(), $("#time_id").val() );
+        handleWorkFlow.handleRun($("#time_id").val(), handleWorkFlow.counter);
     });
 
 } );
 
-ipcRenderer.on('estimating_passive_suspension:get:values', (event, values) => {
+// ipcRenderer.on('estimating_passive_suspension:get:values', (event, values) => {
 
-    values = values.split(';');
+//     values = values.split(';');
 
-    handleWorkFlow.handleReceivedValues( values );
-})
+//     handleWorkFlow.handleReceivedValues(values);
+// })
 
 
 
@@ -170,6 +176,7 @@ function setup() {
   strokeWeight(2);  
   frameRate(4);
 
+  drawBackground();
 }
 
 
@@ -207,10 +214,10 @@ function drawLegends() {
 
 function draw() {
 
-    drawBackground();
+    if(handleWorkFlow.isDrawing()) {
 
-    if( handleWorkFlow.isStateRunning() || handleWorkFlow.isStatePause()  ) {
-  
+        drawBackground();
+
         translate(0, 3*height/4);
         
         var firstValue = handleWorkFlow.counter - windowWidth;
@@ -219,8 +226,8 @@ function draw() {
             stroke(255, 0, 0);
             if(i <= handleWorkFlow.counter - halfWidth) {
                 point(i - firstValue, estimator.getSuspensionEstimated(i) + drawHelper.suspensionOffset() );
-                if(handleWorkFlow.connection_type === "tcp")
-                    point(i - firstValue, estimator.getTyreEstimated(i));
+                // if(handleWorkFlow.connection_type === "tcp")
+                point(i - firstValue, estimator.getTyreEstimated(i));
 
                 // stroke(0, 0, 255);
                 // point(i - firstValue, estimator.getSuspensionMeasurement(i) + drawHelper.suspensionOffset() );
@@ -250,18 +257,17 @@ function draw() {
              width/2, estimator.getTyreTruth(handleWorkFlow.counter-halfWidth) - 50 );
         
             
-        if( handleWorkFlow.isStateRunning() ) {
+        // if( handleWorkFlow.isStateRunning() ) {
 
             if( handleWorkFlow.counter < estimator.n - 15 )
                 handleWorkFlow.counter += 15;
             else {
-                handleWorkFlow.state2Finish();
-                noLoop();
+                handleWorkFlow.finishDraw();
+                // handleWorkFlow.state2Finish();
+                // noLoop();
             }
-        }
-
+        // }
     }
-  
 }
 
 

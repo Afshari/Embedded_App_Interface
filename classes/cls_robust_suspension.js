@@ -6,13 +6,13 @@ const { Matrix } = require('ml-matrix');
 var Enum = require('enum');
 
 let State = Object.freeze({
-    NotConnected:                   'Not Connected',
+    NotConnected:                   'Disconnect',
     Connecting:                     'Connecting',
     Connected:                      'Connected',
     Ready:                          'Ready to Run',
     Running:                        'Calculating',
     Drawing:                        'Visualizing Result',
-    DrawFinished:                   'Visualizing Finished',
+    DrawFinished:                   'Visualization Finished',
     Pause:                          'Paused',
 });
 
@@ -55,6 +55,7 @@ rules[State.Drawing] = {
     Reset:                  State.Ready,
     DrawEnd:                State.DrawFinished,
     Pause:                  State.Pause,
+    Replay:                 State.Drawing,
     ConnectionFail:         State.Drawing
 };
 rules[State.Pause] = {
@@ -126,6 +127,7 @@ class HandleWorkFlow {
     handleReplay(counter) {
 
         if(this.state == State.Drawing) {
+            this.state = rules[this.state][Trigger.Replay];
             this.setWorkflow(this.state);
             return this.windowWidth;
         } else if(this.state == State.DrawFinished) {

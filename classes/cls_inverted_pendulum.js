@@ -10,14 +10,14 @@ const { Matrix } = require('ml-matrix');
 var Enum = require('enum');
 
 let State = Object.freeze({
-    NotConnected:                   'Not Connected',
+    NotConnected:                   'Disconnect',
     Connecting:                     'Connecting',
     Connected:                      'Connected',
     ConnectionCheck:                'Connection Check',
     Ready:                          'Ready to Run',
     Running:                        'Calculating',
     Drawing:                        'Visualizing Result',
-    DrawFinished:                   'Visualizing Finished',
+    DrawFinished:                   'Visualization Finished',
 });
 
 let Trigger = Object.freeze({
@@ -33,7 +33,6 @@ let Trigger = Object.freeze({
     Reset:                          'Reset',
     Disconnect:                     'Disconnect',
 });
-
 
 
 let rules = {};
@@ -202,6 +201,7 @@ class HandleWorkFlow {
             this.showFlashMessage("Doesn't Connect to the Server", "WARNING")
         } else if(this.state == State.Running || this.state == State.Drawing) {
             this.showFlashMessage("Already Running", "WARNING")
+            this.showFlashMessage("If You want to Run with different Parameters, First Reset", "INFO")
         } else if(this.state == State.DrawFinished) {
             this.showFlashMessage("First you should 'Reset' before Running Again", "WARNING")
         }
