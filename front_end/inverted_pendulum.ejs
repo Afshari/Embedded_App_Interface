@@ -90,7 +90,11 @@
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
 </div>
-<br /> <br />
+
+<div style="margin: 5px;">
+    <div class="alert alert-success"><b id="workflow">Not Connected</b></div>
+</div>
+
 
 <main>
 </main>
@@ -98,13 +102,6 @@
 <%- include('./partial_imports/import_below_content.ejs') %>
 
 <script type="text/javascript">
-
-// var fileIndex = 0;
-// var fileNames = [ 'xe-4', 'xe-3', 'xe-2', 'xe-1' ];
-
-// [ ] - Add Request to MainIPC to get data
-// [ ] - Get Data from MainIPC and Print to Console
-// [ ] - Draw Received Data on Screen
 
 
 const { Matrix } = require('ml-matrix');
@@ -128,18 +125,21 @@ function calcPendulum() {
     isReadyToDraw = true;
 }
 
+function setWorkflow(txt) {
+    $("#workflow").text(txt)
+}
 
 const windowWidth   = 1200;
 const windowHeight  = 600;
 const halfWidth     = windowWidth / 2;
 
-// const drawHelper = new DrawHelper( controller, windowWidth );
+var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage, setWorkflow );
 
-var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage );
 
 $(document).ready( () => {
 
     $("#btnConnect").click( () => {
+        // setWorkflow("Connect")
         handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });
     $("#btnReset").click( () => {
@@ -171,12 +171,12 @@ const m = 1;
 const M = 5;
 const L = 2 * draw_scale;
 
-const W  = 2    * Math.sqrt(M/5) * draw_scale;        // cart width
-const H  = 0.75 * Math.sqrt(M/5) * draw_scale;        // cart height
-const wr = 0.3  * draw_scale;                         // wheel radius
-const mr = 0.3  * Math.sqrt(m)   * draw_scale;        // mass radius
+const W  = 2    * Math.sqrt(M/5) * draw_scale;          // cart width
+const H  = 0.75 * Math.sqrt(M/5) * draw_scale;          // cart height
+const wr = 0.3  * draw_scale;                           // wheel radius
+const mr = 0.3  * Math.sqrt(m)   * draw_scale;          // mass radius
 
-const y = wr / 2 + H / 2;               // cart vertical position
+const y = wr / 2 + H / 2;                               // cart vertical position
 
 
 

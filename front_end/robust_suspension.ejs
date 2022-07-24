@@ -170,6 +170,7 @@
     <button type="button" class="btn btn-theme"     id="btnReplay">Replay</button>
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnShowTime">Show/Hide Time Line</button>
+    <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
 </div>
 <label class="container"> Show Passive
     <input type="checkbox" id="checkbox_passive" checked>
@@ -179,6 +180,9 @@
     <input type="checkbox" id="checkbox_active" checked>
     <span class="checkmark"></span>
 </label>
+<div style="margin: 5px;">
+    <div class="alert alert-success"><b id="workflow">Not Connected</b></div>
+</div>
 <!-- <br /> -->
 
 <main id="mainCanvas">
@@ -203,6 +207,10 @@ $("#checkbox_active").change(function() {
 $("#checkbox_passive").change(function() {
     showPassive = this.checked
 });
+
+function setWorkflow(txt) {
+    $("#workflow").text(txt)
+}
 
 var s1 = function( sketch ) {
 
@@ -244,7 +252,7 @@ var s1 = function( sketch ) {
                 nb = i;
             }
         }
-        console.log('nb ', nb)
+        // console.log('nb ', nb)
         
         // sketch.line(0, 0, 100, 100)
         for(var i = 0; i < nb; i++) {
@@ -255,10 +263,10 @@ var s1 = function( sketch ) {
             sketch.circle( (i*2)-windowWidth/4, y, 1.5 )
         }
     }
-  };
+};
   
-  // create a new instance of p5 and pass in the function for sketch 1
-  new p5(s1);
+// create a new instance of p5 and pass in the function for sketch 1
+new p5(s1);
 
 
 var fileIndex = 0;
@@ -266,7 +274,7 @@ var fileNames = [ 'x1', 'xp1', 'x2', 'xp2', 'zr', 'zrdot' ];
 
 const { Matrix } = require('ml-matrix');
 
-const { RenderHelper, SuspensionController, DrawHelper, HandleWorkFlow } = require('../classes/cls_robust_suspension');
+const { SuspensionController, DrawHelper, HandleWorkFlow } = require('../classes/cls_robust_suspension');
 
 const windowWidth   = 900;
 const windowHeight  = 600;
@@ -275,7 +283,7 @@ const halfWidth     = windowWidth / 2;
 var   controller = new SuspensionController();
 const drawHelper = new DrawHelper( controller, windowWidth );
 
-var handleWorkFlow = new HandleWorkFlow( controller, ipcRenderer, windowWidth );
+var handleWorkFlow = new HandleWorkFlow(controller, ipcRenderer, windowWidth, showFlashMessage, setWorkflow);
 
 $(document).ready( () => {
 
@@ -283,24 +291,29 @@ $(document).ready( () => {
         handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });
     $("#btnReplay").click( () => {
-        counter = windowWidth;
+        counter = handleWorkFlow.handleReplay(counter);
+    });
+    $("#btnReset").click( () => {
+        handleWorkFlow.handleReset();
     });
     $("#btnPause").click( () => {
-        handleWorkFlow.isReadyToDraw = !handleWorkFlow.isReadyToDraw;
+        //handleWorkFlow.isReadyToDraw = !handleWorkFlow.isReadyToDraw;
+        handleWorkFlow.handlePause();
     });
     $("#btnRun").click( () => {
 
-        handleWorkFlow.isReadyToDraw = false;
-        counter = windowWidth
-        drawBackground();
-        drawLegends();
-        controller.init( a, l );
-        handleWorkFlow.handleRun( );
+        // handleWorkFlow.isReadyToDraw = false;
+        // counter = windowWidth
+        // drawBackground();
+        // drawLegends();
+        // controller.init(a, l);
+        counter = handleWorkFlow.handleRun(counter, a, l, drawBackground, drawLegends);
     });
     $("#btnShowTime").click( () => {
         showTimeLines = !showTimeLines;
 
-        if(handleWorkFlow.isReadyToDraw == false) {
+        // if(handleWorkFlow.isReadyToDraw == false) {
+        if(handleWorkFlow.isDrawing() == false) {
             drawMainView();
         }
     })
@@ -315,10 +328,10 @@ var showTimeLines = false;
 var time = 0;
 var dt = 0;
 
-ipcRenderer.on('robust_suspension:get:values', (event, values) => {
+// ipcRenderer.on('robust_suspension:get:values', (event, values) => {
 
-    handleWorkFlow.handleReceivedValues( values );
-})
+//     handleWorkFlow.handleReceivedValues( values );
+// })
 
 
 function drawLegends() {
@@ -415,16 +428,16 @@ function setup() {
 
 function draw() {
 
-    if(handleWorkFlow.isReadyToDraw == true) {
+    // if(handleWorkFlow.isReadyToDraw == true) {
+    if(handleWorkFlow.isDrawing() == true) {
 
         drawMainView();
 
-        if( counter < controller.xp_suspension.length - 10 )
+        if(counter < controller.xp_suspension.length - 10)
             counter += 10;
         else {
-            // noLoop();
+            handleWorkFlow.finishDraw();
         }
-
     }
 }
 

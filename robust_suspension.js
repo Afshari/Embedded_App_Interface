@@ -9,6 +9,7 @@ const { Matrix } = require('ml-matrix');
 // [ ] - Create class for Proxy
 // [ ] - Add functions of reading data file
 // [ ] - Add drawing function to Renderer File
+// [ ] - Add Reset Button
 // [ ] - 
 
 
@@ -50,37 +51,25 @@ var pack_counter = 0;
 
 function connect(ip, port) {
 
-    // client = new net.Socket();
-    client = net.connect(port, ip, function() {
-        _isConnected = true;
-        console.log("Connected");
-    });
-    console.log(ex);
+    client = new net.Socket();
 
     client.on('error', function(ex) {
-        console.log("handled error");
-        console.log(ex);
+        mainWindow.webContents.send('robust_suspension:connection:fail');
     });
-    client.on('oncomplete', function() {
-        console.log("handled complete");
-        // console.log(ex);
+
+    client.connect(port, ip, function() {
+        _isConnected = true;
+        mainWindow.webContents.send('robust_suspension:connection:pass');
+        console.log("Connected");
     });
+
     client.on('data', function(data) {
 
         data = data.toString();
         pack_counter += 1;
-        // console.log(pack_counter, data.length)
         mainWindow.webContents.send('robust_suspension:get:values', data );
     });
-    // client.connect(port, ip, function() {
-    //     _isConnected = true;
-    //     console.log('Connected');
-    // });
 }
-// client.on('error', function(ex) {
-//     console.log("handled error");
-//     console.log(ex);
-// });
 
 ipcMain.on('robust_suspension:connect', (event, ip, port) => {
 

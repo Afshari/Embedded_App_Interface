@@ -3,7 +3,7 @@ const THREE = require('three');
 const { Matrix } = require('ml-matrix');
 
 // [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
-// [ ] - Show Error Message with Modal
+// [✓] - Show Error Message with Modal
 
 
 
@@ -15,9 +15,9 @@ let State = Object.freeze({
     Connected:                      'Connected',
     ConnectionCheck:                'Connection Check',
     Ready:                          'Ready to Run',
-    Running:                        'Running',
-    Drawing:                        'Drawing',
-    DrawFinished:                   'Draw Finished',
+    Running:                        'Calculating',
+    Drawing:                        'Visualizing Result',
+    DrawFinished:                   'Visualizing Finished',
 });
 
 let Trigger = Object.freeze({
@@ -150,25 +150,26 @@ class InvertedPendulum {
 
 class HandleWorkFlow {
 
-    constructor( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage ) {
+    constructor(inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage, setWorkflow) {
 
         this.state              =   State.NotConnected;
         this.inverted_pendulum  =   inverted_pendulum;
         this.ipcRenderer        =   ipcRenderer;
         this.windowWidth        =   windowWidth;
         this.showFlashMessage   =   showFlashMessage;
+        this.setWorkflow        =   setWorkflow;
 
         this.isReadyToDraw      = false;
         this.counter_remote     = -40
 
         this.ipcRenderer.on('inverted_pendulum:connection:fail', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionFail]
-            console.log(this.state)
+            this.setWorkflow(this.state)
             this.showFlashMessage("Connection Lost", "ERROR")
         });
         this.ipcRenderer.on('inverted_pendulum:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]
-            console.log(this.state)
+            this.setWorkflow(this.state)
             this.showFlashMessage("Successfully Connected to the Server", "INFO")
         });
         this.ipcRenderer.on('inverted_pendulum:get:values', (event, values, isFinished) => {
@@ -181,19 +182,19 @@ class HandleWorkFlow {
 
         if(this.state == State.NotConnected) {
             this.state = rules[this.state][Trigger.Connect]
-            console.log(this.state)
+            this.setWorkflow(this.state)
             this.ipcRenderer.send('inverted_pendulum:connect', ip, port);
         } else {
             this.showFlashMessage("Already Connected", "WARNING")
         }
     }
 
-    handleRun( ref_pos, x0, n_, h_ ) {
+    handleRun(ref_pos, x0, n_, h_) {
 
         if(this.state == State.Ready || this.state == State.Connected) {
 
             this.state = rules[this.state][Trigger.SendData]
-            console.log(this.state)
+            this.setWorkflow(this.state)
             this.inverted_pendulum.y_remote = []
             this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 111, ref_pos.data, x0.data, n_, h_ );
 
@@ -210,7 +211,7 @@ class HandleWorkFlow {
         
         if(this.state == State.DrawFinished) {
             this.state = rules[this.state][Trigger.Replay]
-            console.log(this.state)
+            this.setWorkflow(this.state)
             this.counter_remote = -40
         } else {
             this.showFlashMessage("Action is Not Possible", "WARNING")
@@ -222,7 +223,7 @@ class HandleWorkFlow {
         if(this.state == State.Drawing || this.state == State.DrawFinished) {
             
             this.state = rules[this.state][Trigger.Reset]
-            console.log(this.state)
+            this.setWorkflow(this.state)
 
             this.counter_remote = -40
             this.isReadyToDraw = false
@@ -253,8 +254,7 @@ class HandleWorkFlow {
                 this.counter_remote = -40
                 this.isReadyToDraw = true
                 this.state = rules[this.state][Trigger.ComputationCompleted]
-                console.log(this.state)
-                // this.state2Drawing()
+                this.setWorkflow(this.state)
 
             } else {
                 values = values.split(';')
@@ -270,9 +270,11 @@ class HandleWorkFlow {
     isDrawing() { return this.state == State.Drawing; }
     isConnected() { return this.state == State.Connected;}
     isReady() { return this.state == State.Ready; }
-    finishDraw() { 
-        this.state = rules[this.state][Trigger.DrawEnd];
-        console.log(this.state)
+    finishDraw() {
+        if(this.state == State.Drawing) {
+            this.state = rules[this.state][Trigger.DrawEnd];
+            this.setWorkflow(this.state);
+        }
     }
 }
 

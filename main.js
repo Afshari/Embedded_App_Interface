@@ -10,9 +10,9 @@ var linearAlgebra = require('linear-algebra')(),
 // [✓] - Change default page 
 // [✓] - Print Inverted_Pendulum Initialization
 // [✓] - Print Each Step of Inverted_Pendulum
-// [ ] - Create StateMachine for InvertedPendulum
-// [ ] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
-// [ ] - 
+// [✓] - Create StateMachine for InvertedPendulum
+// [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
+// [ ] - Create StateMachine for RobustSuspension
 
 
 const sot = require('./sot');
