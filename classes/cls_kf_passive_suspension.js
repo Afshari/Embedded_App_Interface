@@ -5,10 +5,10 @@ var linearAlgebra = require('linear-algebra')(),
 
 var Enum = require('enum');
 
-// [ ] - Remove Uart Elements
-// [ ] - Create States
-// [ ] - Create Triggers
-// [ ] - Create Rules
+// [✓] - Remove Uart Elements
+// [✓] - Create States
+// [✓] - Create Triggers
+// [✓] - Create Rules
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
@@ -77,15 +77,6 @@ rules[State.ConnectionCheck] = {
     ConnectionFail:         State.NotConnected,
     ConnectionPass:         State.Ready
 }
-
-// var State = new Enum( { 
-
-//     'ready': 1,
-//     'sendingMeasurements': 2,
-//     'running': 3,
-//     'pause': 4,
-//     'finish': 5
-// })
 
 
 class SuspensionEstimator {
@@ -249,18 +240,6 @@ class HandleWorkFlow {
         return counter;
     }
 
-    // handleStep() {
-
-    //     if( this.isStatePause() ) {
-
-    //         if( this.counter < this.estimator.n - 15 )
-    //             this.counter += 15;
-    //     } else if( this.isStateRunning() ) {
-            
-    //         window.showFlashMessage( "Algorithm is Running", "WARNING" )
-    //     }
-    // }
-
     handlePause() {
 
         if(this.state == State.Drawing) {
@@ -272,11 +251,6 @@ class HandleWorkFlow {
             window.frameRate(40);
             this.setWorkflow(this.state);
         }
-        // if( this.isStateRunning() ) {
-            
-        //     this.state2Pause();
-        //     window.frameRate(4);
-        // }
     }
 
     handleRun(tm, counter) {
@@ -298,24 +272,6 @@ class HandleWorkFlow {
             this.showFlashMessage("First you should 'Reset' before Running Again", "WARNING")
         }
         return counter;
-
-        // if( this.isStateReady() ) {
-
-        //     this.state2SendingMeasurements();
-        //     this.connection_type = c_type;
-        //     this.uart = c_uart;
-        //     this.estimator.init( parseInt(tm) )
-
-        //     if(this.connection_type === "tcp")
-        //         this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-        //     else if(this.connection_type === "uart")
-        //         this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-
-        // } else if( this.isStatePause() ) {
-
-        //     this.state2Running();
-        //     window.frameRate(40);
-        // }
     }
 
     handleReset() {
@@ -329,32 +285,17 @@ class HandleWorkFlow {
 
     handleReceivedValues(values) {
 
-        // if(this.rnd <= (this.estimator.n - 1) && this.isStateSendingMeasurements() ) {
         if(this.rnd <= (this.estimator.n - 1) && this.state == State.Running) {
 
             for(var i = 0; i < values.length; i++) {    
-                // if(this.connection_type === "tcp") {
                 this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i].split(',')[1] ) );
                 this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i].split(',')[0] ) );
-                // } else if(this.connection_type === "uart") {
-                //     this.estimator.setTyreEstimated( this.rnd + i, parseInt( values[i] ) );
-                //     this.estimator.setSuspensionEstimated( this.rnd + i, parseInt( values[i] ) );
-                // }
             }
             
-            // console.log("rnd ", this.rnd)
             if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
-                // if(this.connection_type === "tcp") {
                 this.rnd += this.estimator.ITEM_PER_STEP;
                 this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
-                // } else if(this.connection_type === "uart") {
-                //     this.rnd += this.estimator.ITEM_PER_STEP;
-                //     this.ipcRenderer.send('estimating_passive_suspension:uart:send:measurements', this.uart, 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP );
-                // }
-
-
-                // this.ipcRenderer.send('estimating_passive_suspension:send:measurements', this.estimator.Y.data[0], this.rnd);
             } else {
     
                 this.state = rules[this.state][Trigger.ComputationCompleted]
@@ -374,27 +315,6 @@ class HandleWorkFlow {
             this.setWorkflow(this.state);
         }
     }
-
-
-    // isStateReady() { return this.state == State.ready; }
-
-    // isStateSendingMeasurements() { return this.state == State.sendingMeasurements; }
-
-    // isStateRunning() { return this.state == State.running; }
-
-    // isStatePause() { return this.state == State.pause; }
-
-    // isStateFinish() { return this.state == State.finish; }
-
-    // state2Pause() { this.state = State.pause; }
-
-    // state2Running() { this.state = State.running; }
-
-    // state2SendingMeasurements() { this.state = State.sendingMeasurements; }
-
-    // state2Finish() { this.state = State.finish; }
-
-
 }
 
 class DrawHelper {

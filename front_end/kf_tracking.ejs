@@ -1,5 +1,33 @@
 <%- include('./partial_imports/import_above_content.ejs', { Title: "Tracking with Kalman Filter", PageAddr: 'kf_tracking' } ) %>
 
+<div class="row mt">
+    <div class="col-lg-12">
+        <div class="form-panel">
+        <h4 class="mb"><i class="fa fa-angle-right"></i> Connection Configuration </h4>
+
+        <div class="row mt" id="ip_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt" id="port_div_id">
+            <div class="form-group form-horizontal">
+                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
+                <div class="col-sm-4" style="padding-left: 0px;">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                </div>
+            </div>
+        </div>
+
+        </div>
+        <!-- /form-panel -->
+    </div>
+    <!-- /col-lg-12 -->
+</div>
 
 <!-- INLINE FORM ELELEMNTS -->
 <div class="row mt">
@@ -45,8 +73,7 @@
             </div>
         </div>
 
-
-        <div class="row mt">
+        <!-- <div class="row mt">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
@@ -67,8 +94,7 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
             </div>
-        </div>
-
+        </div> -->
 
         </div>
         <!-- /form-panel -->
@@ -77,6 +103,7 @@
 </div>
 
 <div style="margin: 5px;">
+    <button type="button" class="btn btn-theme"   id="btnConnect">Connect</button>
     <button type="button" class="btn btn-theme"   id="btnResetAll">Reset All</button>
     <button type="button" class="btn btn-success" id="btnMeasure">Add Measurement to Path</button>
     <button type="button" class="btn btn-primary" id="btnRun" >Run</button>
@@ -84,6 +111,9 @@
     <button type="button" class="btn btn-primary" id="btnPause" >Pause</button>
     <button type="button" class="btn btn-primary" id="btnStep" >Step</button>
 
+</div>
+<div style="margin: 5px;">
+    <div class="alert alert-success"><b id="workflow">Disconnect</b></div>
 </div>
 
 <main>
@@ -94,31 +124,30 @@
 
 <script type="text/javascript">
 
-const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
-var Enum = require('enum')
-
-var State = new Enum( { 
-
-    'ready': 1,
-    'pause': 2,
-    'drawData': 3,
-    'addData': 4,
-    'addInitial': 5,
-    'running': 7,
-    'step': 8
-
-} )
-
-var state = State.ready;
-var lastState = State.ready;
+function setWorkflow(txt) {
+    $("#workflow").text(txt)
+}
 
 const windowWidth = 900;
 const windowHeight = 600;
-var kfResults = []
 
-var groundTruthX = 0
-var groundTruthY = 0
-const CLUTTER_PER_STEP = 1;
+const { Matrix, EigenvalueDecomposition } = require('ml-matrix')
+// const { ipcRenderer } = require('electron')
+
+const { DrawHelper, HandleWorkFlow, DrawState, DrawTrigger, draw_rules } = require('../classes/cls_kf_tracking');
+
+var drawHelper = new DrawHelper();
+var handleWorkFlow = new HandleWorkFlow(ipcRenderer, drawHelper, windowWidth, showFlashMessage, setWorkflow);
+
+
+
+// const windowWidth = 900;
+// const windowHeight = 600;
+// var kfResults = []
+
+// var groundTruthX = 0
+// var groundTruthY = 0
+// const CLUTTER_PER_STEP = 1;
 
 var init_x = 0;
 var init_y = 0;
@@ -126,144 +155,157 @@ var std_x  = 0.1;
 var std_y  = 0.1;
 var process_noise  = 1;
 var dt  = 0.1;
-var connection_type = "";
-var uart = "";
+
+// var connection_type = "";
+// var uart = "";
 
 
 // const matrix = Matrix.ones(5, 5);
 
-var HH = new Matrix([ [1., 0., 0., 0.],
-                      [0., 1., 0., 0.] ])
+// var HH = new Matrix([ [1., 0., 0., 0.],
+//                       [0., 1., 0., 0.] ])
+
+// var arrayMaxIndex = function(array) {
+//   return array.indexOf(Math.max.apply(null, array));
+// };
+// var arrayMinIndex = function(array) {
+//   return array.indexOf(Math.min.apply(null, array));
+// };
 
 
-var arrayMaxIndex = function(array) {
-  return array.indexOf(Math.max.apply(null, array));
-};
-var arrayMinIndex = function(array) {
-  return array.indexOf(Math.min.apply(null, array));
-};
+// function getWidthHeightOrient(covar, HH) {
 
+//     var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
+//     var w = e.realEigenvalues;
+//     // console.log(w)
+//     var v = e.eigenvectorMatrix;
+//     // console.log(v)
+//     max_ind = arrayMaxIndex(w)
+//     min_ind = arrayMinIndex(w)
 
-function getWidthHeightOrient(covar, HH) {
+//     var width  = 2 * Math.sqrt(w[max_ind])
+//     var height = 2 * Math.sqrt(w[min_ind])
 
-    var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
-    var w = e.realEigenvalues;
-    // console.log(w)
-    var v = e.eigenvectorMatrix;
-    // console.log(v)
-    max_ind = arrayMaxIndex(w)
-    min_ind = arrayMinIndex(w)
-
-    var width  = 2 * Math.sqrt(w[max_ind])
-    var height = 2 * Math.sqrt(w[min_ind])
-
-    var orientation = Math.atan2( v.data[1][max_ind], v.data[0][max_ind])
+//     var orientation = Math.atan2( v.data[1][max_ind], v.data[0][max_ind])
     
-    return { width: width, height: height, orientation: orientation }
-}
+//     return { width: width, height: height, orientation: orientation }
+// }
 
 var measurement = []
 
 $(document).ready( () => {
 
-    const { ipcRenderer } = require('electron')
+    // const { ipcRenderer } = require('electron')
 
-    ipcRenderer.on('kf_tracking:result', (event, x, y) => {
+    // ipcRenderer.on('kf_tracking:result', (event, x, y) => {
 
-        if(x == -1 && y == -1) {
+    //     if(x == -1 && y == -1) {
 
-            // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
-            sendData(101, pathMeasurements[stepPointer]);
+    //         // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+    //         sendData(101, pathMeasurements[stepPointer]);
 
-        } else {
+    //     } else {
 
-            kfResults.push([x, y])
+    //         kfResults.push([x, y])
 
-            if(state == State.running && stepPointer < points.length - 1) {
+    //         if(state == State.running && stepPointer < points.length - 1) {
 
-                stepPointer += 1;
-                // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
-                sendData(101, pathMeasurements[stepPointer]);
+    //             stepPointer += 1;
+    //             // ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, pathMeasurements[stepPointer]);
+    //             sendData(101, pathMeasurements[stepPointer]);
 
-            } else {
-                // showFlashMessage('There is not Data for Tracking', 'WARNING');
-            }
-        }
+    //         } else {
+    //             // showFlashMessage('There is not Data for Tracking', 'WARNING');
+    //         }
+    //     }
 
-    })
+    // })
 
-    ipcRenderer.send('uart:reload');
+    // ipcRenderer.send('uart:reload');
 
     // Load UART on Reload Button Click
-    $("#reloadUart").click( (event) => {
-        ipcRenderer.send('uart:reload');
-    });
-    ipcRenderer.on('uart:data', (event, ports) => {
+    // $("#reloadUart").click( (event) => {
+    //     ipcRenderer.send('uart:reload');
+    // });
+    // ipcRenderer.on('uart:data', (event, ports) => {
 
-        $('#uart_select').find('option').remove();
-        ports.forEach(function(port){
-            $("#uart_select").append(new Option(port['path'], port['path']));
-        });
-    });
+    //     $('#uart_select').find('option').remove();
+    //     ports.forEach(function(port){
+    //         $("#uart_select").append(new Option(port['path'], port['path']));
+    //     });
+    // });
 
-    function sendData(code, params) {
+    // function sendData(code, params) {
 
-        if(connection_type === "uart") {
+        // if(connection_type === "uart") {
+            // ipcRenderer.send('kf_tracking:uart:send:measurements', uart, code, params);
+        // } else if(connection_type === "tcp") {
 
-            ipcRenderer.send('kf_tracking:uart:send:measurements', uart, code, params);
-
-        } else if(connection_type === "tcp") {
-
-            ipcRenderer.send('kf_tracking:tcp:send:measurements', code, params);
-        }
-
-    }
+            // ipcRenderer.send('kf_tracking:tcp:send:measurements', code, params);
+        // }
+    // }
 
 
     $("#btnResetAll").click(function() {
-        eraseAll();
-        state = State.ready;
-        frameRate(30);
-    })
+
+        if(drawHelper.canErase() == true) {
+            eraseAll();
+            frameRate(30);
+        }
+    });
+
+    $("#btnConnect").click(function() {
+        handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
+    });
 
     $("#btnMeasure").click(function() {
 
-        if(state == State.drawData) {
+        // if(state == State.drawData) {
+
+        //     if(points.length > 0)
+        //         addMeasurementToPath();
+        //     else
+        //         showFlashMessage('First You have to Draw Path', 'WARNING');
+        // } else {
+        //     showFlashMessage('Make Sure to Draw Path First', 'WARNING');
+        // }
+        if(drawHelper.canMeasure() == true) {
 
             if(points.length > 0)
                 addMeasurementToPath();
             else
                 showFlashMessage('First You have to Draw Path', 'WARNING');
-        } else {
-            showFlashMessage('Make Sure to Draw Path First', 'WARNING');
-        }
+        }   
     })
 
     $("#btnInitial").click(function() {
 
-        if(state == State.drawData) {
-
-            lastState = State.drawData;
-            state = State.addInitial;
-
-        } else if(state == State.ready) {
-
-            lastState = State.ready;
-            state = State.addInitial;
-
-        } else if(state == State.running) {
-            showFlashMessage('Already Running', 'INFO');
+        if(drawHelper.canInit() == true) {
+            drawHelper.draw_state = draw_rules[drawHelper.draw_state][DrawTrigger.AddPoint];
         }
+        // if(state == State.drawData) {
+
+        //     lastState = State.drawData;
+        //     state = State.addInitial;
+
+        // } else if(state == State.ready) {
+
+        //     lastState = State.ready;
+        //     state = State.addInitial;
+
+        // } else if(state == State.running) {
+        //     showFlashMessage('Already Running', 'INFO');
+        // }
     })
 
     $("#btnRun").click(function() {
 
-        if(state == State.running) {
+        if(points.length == 0) {
+            showFlashMessage('First You have to Draw Path', 'WARNING');
+        } else if(pathMeasurements.length == 0) {
+            showFlashMessage('You have to Add Measurements', 'WARNING');
+        } else {
 
-            showFlashMessage('Already Running', 'INFO');
-
-        } else if(state == State.drawData &&  pathMeasurements.length > 0) {
-            
             init_x = $("#init_x").val() != "" ? $("#init_x").val() : 0;
             init_y = $("#init_y").val() != "" ? $("#init_y").val() : 0;
             std_x  = $("#std_x").val()  != "" ? $("#std_x").val()  : 0.1;
@@ -271,29 +313,46 @@ $(document).ready( () => {
             process_noise  = $("#process_noise").val() != "" ? $("#process_noise").val() : 1;
             dt  = $("#dt").val() != "" ? $("#dt").val() : 0.1;
 
-            params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
+            params = [init_x, init_y, std_x, std_y, dt, process_noise]
 
-            connection_type = $("#connection_type").val();
-            uart = $("#uart_select").val();
-
-
-            // ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
-            sendData(100, params);
-            frameRate(4);
-            state = State.running;
-
-
-        } else if(state == State.pause || state == State.step) {
-            frameRate(4);
-            state = State.running;
-        } 
-        
-        
-        else if(points.length == 0) {
-            showFlashMessage('First You have to Draw Path', 'WARNING');
-        } else {
-            showFlashMessage('You have to Add Measurements', 'WARNING');
+            handleWorkFlow.handleRun(params);
         }
+
+        // if(state == State.running) {
+
+        //     showFlashMessage('Already Running', 'INFO');
+
+        // } else if(state == State.drawData &&  pathMeasurements.length > 0) {
+            
+        //     init_x = $("#init_x").val() != "" ? $("#init_x").val() : 0;
+        //     init_y = $("#init_y").val() != "" ? $("#init_y").val() : 0;
+        //     std_x  = $("#std_x").val()  != "" ? $("#std_x").val()  : 0.1;
+        //     std_y  = $("#std_y").val()  != "" ? $("#std_y").val()  : 0.1;
+        //     process_noise  = $("#process_noise").val() != "" ? $("#process_noise").val() : 1;
+        //     dt  = $("#dt").val() != "" ? $("#dt").val() : 0.1;
+
+        //     params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
+
+        //     // connection_type = $("#connection_type").val();
+        //     // uart = $("#uart_select").val();
+
+
+        //     // ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
+        //     sendData(100, params);
+        //     frameRate(4);
+        //     state = State.running;
+
+
+        // } else if(state == State.pause || state == State.step) {
+        //     frameRate(4);
+        //     state = State.running;
+        // } 
+        
+        // else if(points.length == 0) {
+        //     showFlashMessage('First You have to Draw Path', 'WARNING');
+        // } else {
+        //     showFlashMessage('You have to Add Measurements', 'WARNING');
+        // }
     })
 
     $("#btnResetCurrent").click(function() {
@@ -327,8 +386,8 @@ $(document).ready( () => {
 
             params = [ init_x, init_y, std_x, std_y, dt, process_noise ]
 
-            connection_type = $("#connection_type").val();
-            uart = $("#uart_select").val();
+            // connection_type = $("#connection_type").val();
+            // uart = $("#uart_select").val();
 
             // ipcRenderer.send('kf_tracking:tcp:send:measurements', 100, params);
             sendData(100, params);
@@ -369,11 +428,10 @@ var points = []
 var clutters = []
 var pathMeasurements = []
 
-// let measurementColor = [ 0, 255, 255, 170 ]
-let measurementColor = [ 0, 0, 0, 170 ]
-let groundtruthColor = [ 0, 0, 255, 255 ]
-let estimatedMeanColor = [ 255, 140, 0, 255 ]
-let estimatedCovarColor = [ 255, 0, 0, 90 ]
+let measurementColor        = [ 0, 0, 0, 170 ]
+let groundtruthColor        = [ 0, 0, 255, 255 ]
+let estimatedMeanColor      = [ 255, 140, 0, 255 ]
+let estimatedCovarColor     = [ 255, 0, 0, 90 ]
 let measurementCircleRadius = 5
 
 function drawLegends() {
@@ -440,8 +498,7 @@ function draw() {
     drawBackground()
     drawLegends()
 
-    if( state == State.addData &&  isInCanvas() ) {
-
+    if(drawHelper.isDrawingActive() == true) {
         var canAddPoint = true
         points.forEach(function(p, index, array) {
             if(dist(mouseX, mouseY, p[0], p[1]) < 10 )
@@ -449,89 +506,122 @@ function draw() {
         })
 
         if(canAddPoint == true)
-            points.push( [mouseX, mouseY] )
+            points.push([mouseX, mouseY])
     }
 
-    if(state == State.drawData || state == State.addData || state == State.addInitial) {
+    points.forEach(function(item, index, array) {
 
-        points.forEach(function(item, index, array) {
-
+        fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+        stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+        circle(item[0], item[1], 3)
+        
+        if(index > 0) {
             fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
             stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-            circle(item[0], item[1], 3)
+            line(item[0], item[1], array[index - 1][0], array[index - 1][1])
+        }
+    })
+    pathMeasurements.forEach(function(item, index, array) {
+
+        fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+        stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+
+        circle(item[0], item[1], 3)
+    })
+
+    handleWorkFlow.kfResults.forEach(function(currObj, index, array) {
+
+        stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+        fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+        var x = currObj[0]
+        var y = currObj[1]
+        circle(x, y, 5)
+
+        if(index > 0) {
+            line(x, y, handleWorkFlow.kfResults[index - 1][0], handleWorkFlow.kfResults[index - 1][1])
+        }
+    })
+
+
+
+    // if( state == State.addData &&  isInCanvas() ) {
+
+    //     var canAddPoint = true
+    //     points.forEach(function(p, index, array) {
+    //         if(dist(mouseX, mouseY, p[0], p[1]) < 10 )
+    //             canAddPoint = false
+    //     })
+
+    //     if(canAddPoint == true)
+    //         points.push( [mouseX, mouseY] )
+    // }
+
+    // if(state == State.drawData || state == State.addData || state == State.addInitial) {
+
+    //     points.forEach(function(item, index, array) {
+
+    //         fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //         stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //         circle(item[0], item[1], 3)
             
-            if(index > 0) {
-                fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-                stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-                line(item[0], item[1], array[index - 1][0], array[index - 1][1])
-            }
-        })
+    //         if(index > 0) {
+    //             fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //             stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //             line(item[0], item[1], array[index - 1][0], array[index - 1][1])
+    //         }
+    //     })
 
-        pathMeasurements.forEach(function(item, index, array) {
+    //     pathMeasurements.forEach(function(item, index, array) {
 
-            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
 
-            circle(item[0], item[1], 3)
-        })
+    //         circle(item[0], item[1], 3)
+    //     })
 
-    } else if(state == State.running || state == State.step) {
+    // } else if(state == State.running || state == State.step) {
 
-        for(var index = 0; index < stepPointer; index++) {
+    //     for(var index = 0; index < stepPointer; index++) {
 
-            var item = points[index];
-            fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-            stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
-            circle(item[0], item[1], 3)
+    //         var item = points[index];
+    //         fill(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //         stroke(groundtruthColor[0], groundtruthColor[1], groundtruthColor[2], groundtruthColor[3])
+    //         circle(item[0], item[1], 3)
 
-            if(index > 0) {
-                line(item[0], item[1], points[index - 1][0], points[index - 1][1])
-            }
-        }
+    //         if(index > 0) {
+    //             line(item[0], item[1], points[index - 1][0], points[index - 1][1])
+    //         }
+    //     }
 
-        measurement = []
+    //     measurement = []
 
-        for(var index = 0; index < stepPointer && index < pathMeasurements.length; index++) {
+    //     for(var index = 0; index < stepPointer && index < pathMeasurements.length; index++) {
 
-            var item = pathMeasurements[index];
+    //         var item = pathMeasurements[index];
 
-            fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
-            stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         fill(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
+    //         stroke(measurementColor[0], measurementColor[1], measurementColor[2], measurementColor[3])
 
-            circle(item[0], item[1], 3);
+    //         circle(item[0], item[1], 3);
 
-            if(index == stepPointer - 1)
-                measurement = item;
-        }
+    //         if(index == stepPointer - 1)
+    //             measurement = item;
+    //     }
 
         
-        // if(state == State.running && stepPointer < points.length - 1) {
-        //     // console.log(measurement.length)
-            
-        //     if(measurement.length != 0) {
+    //     kfResults.forEach(function(currObj, index, array) {
 
-        //         ipcRenderer.send('kf_tracking:tcp:send:measurements', 101, measurement)
-        //     }
+    //         stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    //         fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
+    //         var x = currObj[0]
+    //         var y = currObj[1]
+    //         circle(x, y, 5)
 
-        //     stepPointer += 1;
-        //     // state = State.step;
-        // }
-
-        kfResults.forEach(function(currObj, index, array) {
-
-            stroke(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
-            fill(estimatedMeanColor[0], estimatedMeanColor[1], estimatedMeanColor[2], estimatedMeanColor[3])
-            var x = currObj[0]
-            var y = currObj[1]
-            circle(x, y, 5)
-
-            if(index > 0) {
-                line(x, y, kfResults[index - 1][0], kfResults[index - 1][1])
-            }
-        })
-
-    }    
-
+    //         if(index > 0) {
+    //             line(x, y, kfResults[index - 1][0], kfResults[index - 1][1])
+    //         }
+    //     })
+    // }    
 }
 
 function eraseAll() {
@@ -562,29 +652,47 @@ function isInCanvas() {
 
 function mousePressed() {
 
-    if( isInCanvas() ) { 
-        
-        if(state == State.ready)
-            state = State.drawData;
+    if(isInCanvas() == true) {
 
-        if(state == State.drawData) {
-
+        if(drawHelper.canDraw() == true) {
             eraseAll();
-            state = State.addData;
+            drawHelper.draw_state = draw_rules[drawHelper.draw_state][DrawTrigger.Draw];
 
-        } else if(state == State.addInitial) {
+        } else if(drawHelper.isInitActive() == true) {
 
-            $("#init_x").val(mouseX);
-            $("#init_y").val(mouseY);
-            state = lastState;
+            $("#init_x").val(parseInt(mouseX));
+            $("#init_y").val(parseInt(mouseY));
+            drawHelper.draw_state = draw_rules[drawHelper.draw_state][DrawTrigger.PointAdded];
         }
     }
+
+
+    // if( isInCanvas() ) { 
+        
+    //     if(state == State.ready)
+    //         state = State.drawData;
+
+    //     if(state == State.drawData) {
+
+    //         eraseAll();
+    //         state = State.addData;
+
+    //     } else if(state == State.addInitial) {
+
+    //         $("#init_x").val(mouseX);
+    //         $("#init_y").val(mouseY);
+    //         state = lastState;
+    //     }
+    // }
 }
 
 function mouseReleased() {
 
-    if(state == State.addData)
-        state = State.drawData;
+    if(drawHelper.draw_state == DrawState.Drawing) {
+        drawHelper.draw_state = draw_rules[drawHelper.draw_state][DrawTrigger.StopDraw]
+    }
+    // if(state == State.addData)
+    //     state = State.drawData;
 }
 
 </script>

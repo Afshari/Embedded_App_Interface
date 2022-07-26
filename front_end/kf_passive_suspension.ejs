@@ -99,40 +99,13 @@ const halfWidth     = windowWidth / 2;
 
 var estimator = new SuspensionEstimator();
 // estimator.init();
-const drawHelper = new DrawHelper( estimator, windowWidth );
+const drawHelper = new DrawHelper(estimator, windowWidth);
 
 var handleWorkFlow = new HandleWorkFlow(estimator, ipcRenderer, windowWidth, showFlashMessage, setWorkflow);
 // console.log( handleWorkFlow );
 
 
 $(document).ready( () => {
-
-    // ipcRenderer.send('uart:reload');
-
-    // $('#connection_type').on('change', function() {
-    //     if( $("#connection_type").val() == "uart" ) {
-    //         $('#ip_div_id').hide();
-    //         $('#port_div_id').hide();
-    //         $('#uart_div_id').show();
-    //     } else if( $("#connection_type").val() == "tcp" ) {
-    //         $('#ip_div_id').show();
-    //         $('#port_div_id').show();
-    //         $('#uart_div_id').hide();
-    //     }
-    // });
-
-    // Load UART on Reload Button Click
-    // $("#reloadUart").click( (event) => {
-    //     ipcRenderer.send('uart:reload');
-    // });
-    // ipcRenderer.on('uart:data', (event, ports) => {
-
-    //     $('#uart_select').find('option').remove();
-    //     ports.forEach(function(port){
-    //         $("#uart_select").append(new Option(port['path'], port['path']));
-    //     });
-    // });
-
 
     $("#btnConnect").click( () => {
 
@@ -160,14 +133,6 @@ $(document).ready( () => {
     });
 
 } );
-
-// ipcRenderer.on('estimating_passive_suspension:get:values', (event, values) => {
-
-//     values = values.split(';');
-
-//     handleWorkFlow.handleReceivedValues(values);
-// })
-
 
 
 function setup() {
@@ -226,11 +191,7 @@ function draw() {
             stroke(255, 0, 0);
             if(i <= handleWorkFlow.counter - halfWidth) {
                 point(i - firstValue, estimator.getSuspensionEstimated(i) + drawHelper.suspensionOffset() );
-                // if(handleWorkFlow.connection_type === "tcp")
                 point(i - firstValue, estimator.getTyreEstimated(i));
-
-                // stroke(0, 0, 255);
-                // point(i - firstValue, estimator.getSuspensionMeasurement(i) + drawHelper.suspensionOffset() );
             }
             
             stroke(0);
@@ -257,16 +218,11 @@ function draw() {
              width/2, estimator.getTyreTruth(handleWorkFlow.counter-halfWidth) - 50 );
         
             
-        // if( handleWorkFlow.isStateRunning() ) {
-
-            if( handleWorkFlow.counter < estimator.n - 15 )
-                handleWorkFlow.counter += 15;
-            else {
-                handleWorkFlow.finishDraw();
-                // handleWorkFlow.state2Finish();
-                // noLoop();
-            }
-        // }
+        if(handleWorkFlow.counter < estimator.n - 15) {
+            handleWorkFlow.counter += 15;
+        } else {
+            handleWorkFlow.finishDraw();
+        }
     }
 }
 

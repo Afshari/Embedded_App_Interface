@@ -3,11 +3,20 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
 
 const  net = require('net');
-const  SerialPort = require('serialport');
-const  ByteLength = require('@serialport/parser-byte-length');
+// const  SerialPort = require('serialport');
+// const  ByteLength = require('@serialport/parser-byte-length');
+
+// [✓] - Create a file in cls directory for kf_tracking
+// [✓] - Test TCP Connection
+// [✓] - Create a function for TCP Connect
+// [✓] - Send TCP Connect Request from ejs to backend js
+// [✓] - Find Init Code & Send Measurement Code             --> (100, 101)
+// [ ] - Try to Pack measurements for sending data over TCP
+// [ ] - Create a class for HandleDraw
+// [ ] - 
 
 
-let mainWindow
+var mainWindow;
 var _isActive = false;
 var _isConnected = false;
 let intervalObj;
@@ -15,16 +24,15 @@ let intervalObj;
 
 // const SERVER_IP = '127.0.0.1';
 // const SERVER_PORT = 5090;
-const SERVER_IP = '192.168.1.15';
-const SERVER_PORT = 5555;
-var client = new net.Socket();
+// const SERVER_IP = '192.168.1.15';
+// const SERVER_PORT = 5555;
 
-const UART_DATA_LENGTH = 300;
-const UART_RECV_LENGTH = 30;
+// const UART_DATA_LENGTH = 300;
+// const UART_RECV_LENGTH = 30;
 
 module.exports = {
     init,
-    connect,
+    // connect,
     isActive,
     deactivate
 }
@@ -66,123 +74,131 @@ function isActive() {
 }
 
 
-function connect() {
+var client;
 
-    client.connect(SERVER_PORT, SERVER_IP, function() {
+function connect(ip, port) {
+
+    client = new net.Socket();
+
+    client.on('error', function(ex) {
+        mainWindow.webContents.send('kf_tracking:connection:fail');
+    });
+
+    client.connect(port, ip, function() {
         _isConnected = true;
+        mainWindow.webContents.send('kf_tracking:connection:pass');
         console.log('Connected');
     });
-}
 
+    client.on('data', function(data) {
 
-function sendCommandUart(data) {
-
-    port.write(data, (err) => {
-        if(err) 
-            console.log('Error on write: ', err.message);
+        data = data.toString();
+    
+        if(data === "corrupted") {
+            mainWindow.webContents.send('kf_tracking:result', -1, -1);
+        } else {
+            data = data.toString().split(',');
+            var x = parseInt( data[0] )
+            var y = parseInt( data[1] )
+            
+            mainWindow.webContents.send('kf_tracking:result', x, y);
+        }
+    })
+    
+    client.on('close', function() {
+        _isConnected = false;
+        console.log('Connection closed');
     });
 }
 
-ipcMain.on('kf_tracking:uart:send:measurements', (event, uart, code, measurement) => {
+ipcMain.on('kf_tracking:connect', (event, ip, port) => {
+    connect(ip, port);
+});
 
+ipcMain.on('kf_tracking:tcp:send:measurements', (event, code, data) => {
 
-    if ( typeof port === 'undefined' ) {
-
-        port = new SerialPort(uart, { baudRate: 115200 });
-        const parser = port.pipe( new ByteLength( { length: UART_RECV_LENGTH } ) );
-
-        port.on('error', function(err) {
-            console.log('Error: ', err.message);
-        });
-
-        parser.on('data', function(data) {
-
-            let currData = data.toString();
-            console.log(currData);
-
-            if( currData.indexOf("corrupted") !== -1 ) {
-
-                mainWindow.webContents.send('kf_tracking:result', -1, -1);
-                
-            } else  {
-        
-                currData = currData.replace(/_/g,"");
-                currData = currData.split(',');
-                var x = parseInt( currData[0] )
-                var y = parseInt( currData[1] )
-                
-                mainWindow.webContents.send('kf_tracking:result', x, y);
-
-            } 
-        });
-    }
-
-    let strData = `${code}:${measurement}`;
+    let strData = `${code}:${data}`;
     strData = `${strData.length}:${strData}`;
-    for(var i = strData.length; i < UART_DATA_LENGTH; i++) {
-        strData += "_";
-    }
-    console.log(strData);
-    sendCommandUart(strData);
+    client.write(strData);
 
+
+    // if(_isConnected == false) {
+
+    //     client.connect(SERVER_PORT, SERVER_IP, function() {
+        
+    //         _isConnected = true;
+    //         console.log('Connected');
+
+    //         let strData = `${code}:${measurement}`;
+    //         strData = `${strData.length}:${strData}`;
+    //         client.write(strData);
+    //     });
+
+    // } else {
+
+    //     let strData = `${code}:${measurement}`;
+    //     strData = `${strData.length}:${strData}`;
+    //     client.write(strData);
+    // }
 });
 
 
+// function sendCommandUart(data) {
 
-ipcMain.on('kf_tracking:tcp:send:measurements', (event, code, measurement) => {
+//     port.write(data, (err) => {
+//         if(err) 
+//             console.log('Error on write: ', err.message);
+//     });
+// }
 
-	console.log(measurement);
+// ipcMain.on('kf_tracking:uart:send:measurements', (event, uart, code, measurement) => {
 
-    if(_isConnected == false) {
 
-        client.connect(SERVER_PORT, SERVER_IP, function() {
+//     if ( typeof port === 'undefined' ) {
+
+//         port = new SerialPort(uart, { baudRate: 115200 });
+//         const parser = port.pipe( new ByteLength( { length: UART_RECV_LENGTH } ) );
+
+//         port.on('error', function(err) {
+//             console.log('Error: ', err.message);
+//         });
+
+//         parser.on('data', function(data) {
+
+//             let currData = data.toString();
+//             console.log(currData);
+
+//             if( currData.indexOf("corrupted") !== -1 ) {
+
+//                 mainWindow.webContents.send('kf_tracking:result', -1, -1);
+                
+//             } else  {
         
-            _isConnected = true;
-            console.log('Connected');
+//                 currData = currData.replace(/_/g,"");
+//                 currData = currData.split(',');
+//                 var x = parseInt( currData[0] )
+//                 var y = parseInt( currData[1] )
+                
+//                 mainWindow.webContents.send('kf_tracking:result', x, y);
 
-            let strData = `${code}:${measurement}`;
-            strData = `${strData.length}:${strData}`;
-            client.write(strData);
-        });
+//             } 
+//         });
+//     }
 
-    } else {
+//     let strData = `${code}:${measurement}`;
+//     strData = `${strData.length}:${strData}`;
+//     for(var i = strData.length; i < UART_DATA_LENGTH; i++) {
+//         strData += "_";
+//     }
+//     console.log(strData);
+//     sendCommandUart(strData);
 
-        let strData = `${code}:${measurement}`;
-        strData = `${strData.length}:${strData}`;
-        client.write(strData);
-    }
-});
-
-
-
-client.on('data', function(data) {
-
-    data = data.toString();
-    console.log(data);
-
-    if(data === "corrupted") {
-
-        mainWindow.webContents.send('kf_tracking:result', -1, -1);
-        
-    } else {
-
-        data = data.toString().split(',');
-        var x = parseInt( data[0] )
-        var y = parseInt( data[1] )
-        
-        mainWindow.webContents.send('kf_tracking:result', x, y);
-    }
-
-})
+// });
 
 
 
-client.on('close', function() {
 
-    _isConnected = false;
-	console.log('Connection closed');
 
-});
 
 
 

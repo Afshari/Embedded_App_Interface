@@ -1,7 +1,6 @@
 
-const THREE = require('three');
+// const THREE = require('three');
 const { Matrix } = require('ml-matrix');
-
 
 var Enum = require('enum');
 
@@ -72,14 +71,6 @@ rules[State.ConnectionCheck] = {
     ConnectionFail:         State.NotConnected,
     ConnectionPass:         State.Ready
 }
-
-// var State = new Enum( { 
-//     'ready': 1,
-//     'sendingMeasurements': 2,
-//     'running': 3,
-//     'pause': 4,
-//     'finish': 5
-// })
 
 
 

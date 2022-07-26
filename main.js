@@ -12,14 +12,14 @@ var linearAlgebra = require('linear-algebra')(),
 // [✓] - Print Each Step of Inverted_Pendulum
 // [✓] - Create StateMachine for InvertedPendulum
 // [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
-// [ ] - Create StateMachine for RobustSuspension
+// [✓] - Create StateMachine for RobustSuspension
 
 
 const sot = require('./sot');
 const rls = require('./rls');
 const a_star = require('./a_star');
 const siamfc = require('./siamfc');
-// const kf_tracking = require('./kf_tracking');
+const kf_tracking = require('./kf_tracking');
 const kf_passive_suspension = require('./kf_passive_suspension');
 const robust_suspension = require('./robust_suspension');
 const ekf_localization = require('./ekf_localization');
@@ -61,7 +61,7 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	// else if(lastPage === 'lite_ids.ejs') { }
 	else if(lastPage === 'a_star.ejs')					a_star.deactivate();
 	else if(lastPage === 'siamfc.ejs') 					siamfc.deactivate();
-	// else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
+	else if(lastPage === 'kf_tracking.ejs')				kf_tracking.deactivate();
 	else if(lastPage === 'kf_passive_suspension.ejs')	kf_passive_suspension.deactivate();
 	else if(lastPage === 'robust_suspension.ejs')		robust_suspension.deactivate();
 	else if(lastPage === 'ekf_localization.ejs')		ekf_localization.deactivate();
@@ -101,8 +101,8 @@ ipcMain.on("menu:page:change", function(event, addr) {
  
 	} else if(addr === 'kf_tracking.ejs') {
 
-		// kf_tracking.init(win);
-		// win.loadFile('front_end/kf_tracking.ejs');
+		kf_tracking.init(win);
+		win.loadFile('front_end/kf_tracking.ejs');
 
 	} else if(addr === 'ekf_localization.ejs') {
 
