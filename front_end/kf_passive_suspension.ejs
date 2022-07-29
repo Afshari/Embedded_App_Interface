@@ -129,7 +129,7 @@ $(document).ready( () => {
 
     $("#btnRun").click( () => {
 
-        handleWorkFlow.handleRun($("#time_id").val(), handleWorkFlow.counter);
+        handleWorkFlow.counter = handleWorkFlow.handleRun($("#time_id").val(), handleWorkFlow.counter);
     });
 
 } );

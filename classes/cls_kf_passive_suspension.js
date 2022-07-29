@@ -79,6 +79,8 @@ rules[State.ConnectionCheck] = {
 }
 
 
+// This class is just for Testing Algorithm
+// The Result will come from C++ Application
 class SuspensionEstimator {
 
     static scl = 333;
@@ -91,7 +93,7 @@ class SuspensionEstimator {
     init( tm ) {
 
         const dt = 0.001;
-        this.ITEM_PER_STEP = 50;
+        this.ITEM_PER_STEP = 10;
         this.Tf = tm;
         // this.Tf = 3;
         this.n = this.Tf / dt;
@@ -191,7 +193,7 @@ class HandleWorkFlow {
         this.counter            = windowWidth;
         this.showFlashMessage   = showFlashMessage;
         this.setWorkflow        = setWorkflow;
-        this.rnd = 0;
+        this.rnd                = 0;
         // this.connection_type = "";
         // this.uart = "";
 
@@ -257,10 +259,12 @@ class HandleWorkFlow {
 
         if(this.state == State.Ready || this.state == State.Connected) {
 
+            console.log("Run")
             this.state = rules[this.state][Trigger.SendData]
             this.setWorkflow(this.state)
+            this.rnd = 0;
             this.estimator.init(parseInt(tm))
-            this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
+            this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', 120, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
             return this.windowWidth;
             
         } else if(this.state == State.NotConnected) {
@@ -295,7 +299,7 @@ class HandleWorkFlow {
             if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
                 this.rnd += this.estimator.ITEM_PER_STEP;
-                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
+                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
             } else {
     
                 this.state = rules[this.state][Trigger.ComputationCompleted]

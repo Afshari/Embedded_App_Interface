@@ -2,7 +2,8 @@
 const { Matrix } = require('ml-matrix');
 
 
-// [ ] - Create disable & enable function for DrawHelper
+// [✓] - Create disable & enable function for DrawHelper
+
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
@@ -10,9 +11,7 @@ let State = Object.freeze({
     Connected:                      'Connected',
     Ready:                          'Ready to Run',
     Running:                        'Calculating',
-    Drawing:                        'Visualizing Result',
-    DrawFinished:                   'Visualization Finished',
-    Pause:                          'Paused',
+    Visualization:                  'Visualization',
 });
 
 let Trigger = Object.freeze({
@@ -22,13 +21,8 @@ let Trigger = Object.freeze({
     SendData:                       'SendData',
     ComputationCompleted:           'ComputationCompleted',
     Draw:                           'Draw',
-    DrawEnd:                        'DrawEnd',
-    Replay:                         'Replay',
     Reset:                          'Reset',
-    Resume:                         'Resume',
-    Pause:                          'Pause'
 });
-
 
 
 let rules = {};
@@ -48,33 +42,15 @@ rules[State.Ready] = {
     ConnectionFail:     State.NotConnected
 };
 rules[State.Running] = {
-    Pause:                  State.Running,
-    ComputationCompleted:   State.Drawing,
+    ComputationCompleted:   State.Visualization,
     ConnectionFail:         State.NotConnected
 };
-rules[State.Drawing] = {
+rules[State.Visualization] = {
     Reset:                  State.Ready,
-    DrawEnd:                State.DrawFinished,
-    Pause:                  State.Pause,
-    Replay:                 State.Drawing,
-    ConnectionFail:         State.Drawing
+    ConnectionFail:         State.Visualization
 };
-rules[State.Pause] = {
-    Resume:                 State.Drawing,
-    Reset:                  State.Ready,
-    ConnectionFail:         State.Pause
-};
-rules[State.DrawFinished] = {
-    Replay:                 State.Drawing,
-    Reset:                  State.Ready,
-    ConnectionFail:         State.DrawFinished,
-};
-rules[State.ConnectionCheck] = {
-    ConnectionFail:         State.NotConnected,
-    ConnectionPass:         State.Ready
-}
 
-/////////////////////////////////////////////////////////////////////////
+// DrawState, DrawTrigger, DrawRules
 let DrawState = Object.freeze({
     Ready:                      'Ready',
     Drawing:                    'Drawing',
@@ -121,8 +97,6 @@ class HandleWorkFlow {
         this.showFlashMessage = showFlashMessage;
         this.setWorkflow = setWorkflow;
 
-        // this.windowWidth = 900;
-        // this.windowHeight = 600;
         this.windowWidth = windowWidth;
         this.kfResults = []
 
@@ -160,27 +134,24 @@ class HandleWorkFlow {
 
         this.ipcRenderer.on('kf_tracking:result', (event, x, y) => {
 
-            console.log("Result: ", x, y)
             if(x == -1 && y == -1) {
     
-                this.sendData(101, pathMeasurements[stepPointer]);
+                this.sendData(101, pathMeasurements[this.stepPointer]);
     
             } else {
     
                 this.kfResults.push([x, y])
-                if(this.state == State.Running && stepPointer < points.length - 1) {
+                if(this.state == State.Running && this.stepPointer < this.pathMeasurements.length - 1) {
     
-                    stepPointer += 1;
-                    this.sendData(101, pathMeasurements[stepPointer]);
+                    this.stepPointer += 1;
+                    this.sendData(111, this.pathMeasurements[this.stepPointer]);
     
                 } else {
                     this.state = rules[this.state][Trigger.ComputationCompleted]
                     this.setWorkflow(this.state)
-                    // showFlashMessage('There is not Data for Tracking', 'WARNING');
                 }
             }
         })
-    
     }
 
     sendData(code, params) {
@@ -217,27 +188,35 @@ class HandleWorkFlow {
         }
     }
 
-    handleRun(params) {
+    handleRun(params, pathMeasurements) {
 
         if(this.state == State.Connected || this.state == State.Ready) {
             
             this.drawHelper.disable();
+            this.pathMeasurements = pathMeasurements;
+            this.stepPointer = 0;
             this.state = rules[this.state][Trigger.SendData]
             this.setWorkflow(this.state)
-            this.sendData(100, params);
+            this.sendData(110, params);
             window.frameRate(4);
             
-
         } else if(this.state == State.NotConnected) {
             this.showFlashMessage("Doesn't Connect to the Server", "WARNING")
+        } else if(this.state == State.Running) {
+            this.showFlashMessage("Already Running", "WARNING")
+        } else if(this.state == State.Visualization) {
+            this.showFlashMessage("First You have to Reset, before Running again", "WARNING")
         }
-        
-        // else if(state == State.pause || state == State.step) {
-        //     window.frameRate(4);
-        //     state = State.running;
-        // } else if(this.state == State.running) {
-        //     this.showFlashMessage('Already Running', 'INFO');
-        // }
+    }
+    canReset() {
+        return this.state == State.Visualization;
+    }
+    setReady() {
+        if(this.state == State.Visualization) {
+            this.state = rules[this.state][Trigger.Reset]
+            this.drawHelper.enable();
+            this.setWorkflow(this.state)
+        }
     }
 }
 

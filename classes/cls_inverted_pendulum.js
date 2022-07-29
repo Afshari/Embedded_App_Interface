@@ -195,7 +195,7 @@ class HandleWorkFlow {
             this.state = rules[this.state][Trigger.SendData]
             this.setWorkflow(this.state)
             this.inverted_pendulum.y_remote = []
-            this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 111, ref_pos.data, x0.data, n_, h_ );
+            this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 210, ref_pos.data, x0.data, n_, h_ );
 
         } else if(this.state == State.NotConnected) {
             this.showFlashMessage("Doesn't Connect to the Server", "WARNING")
@@ -262,7 +262,7 @@ class HandleWorkFlow {
                     var arr = values[i].split(',')
                     this.inverted_pendulum.y_remote.push( [ parseFloat(arr[0]), parseFloat(arr[1]) ] )
                 }
-                this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 112)
+                this.ipcRenderer.send('inverted_pendulum:tcp:send:state', 211)
             }
         }
     }

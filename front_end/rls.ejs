@@ -51,7 +51,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="192.168.1.23">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5555">
+                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
                 </div>
             </div>
         </div>
@@ -74,6 +74,9 @@
     <button type="button" class="btn btn-info"      id="btnConnect">Connect</button>
     <button type="button" class="btn btn-primary"   id="btnRun" >Run</button>
     <button type="button" class="btn btn-theme"     id="btnReset">Reset</button>
+</div>
+<div style="margin: 5px;">
+    <div class="alert alert-success"><b id="workflow">Disconnect</b></div>
 </div>
 <br />
 
@@ -108,6 +111,11 @@
 	// const { ipcRenderer } = electron;
 	var mathjaxHelper = require('mathjax-electron')
 
+	function setWorkflow(txt) {
+    	$("#workflow").text(txt)
+	}
+
+	const { HandleWorkFlow } = require('../classes/cls_rls');
 
 	var lineChartData = {
 		labels: [],
@@ -163,47 +171,60 @@
 			displayMode: true,
 			throwOnError: false
 		});
+		console.log("Chart 1", chart)
+		var handleWorkFlow = new HandleWorkFlow(ipcRenderer, chart, showFlashMessage, setWorkflow);
+		handleWorkFlow.setkatex(katex)
 
 
-		ipcRenderer.on('uart:data', (event, ports) => {
+		// ipcRenderer.on('uart:data', (event, ports) => {
 
-			$('#uart_select').find('option').remove();
-			ports.forEach(function(port){
-				$("#uart_select").append(new Option(port['path'], port['path']));
-			});
+		// 	$('#uart_select').find('option').remove();
+		// 	ports.forEach(function(port){
+		// 		$("#uart_select").append(new Option(port['path'], port['path']));
+		// 	});
+		// });
+		$("#btnConnect").click(function() {
+        	handleWorkFlow.handleConnect($('#ip_id').val(), $('#port_id').val());
+    	});
+
+
+		$("#btnRun").click( (event) => {
+
+			handleWorkFlow.handleRun();
 		});
 
+		$("#btnReset").click( (event) => {
 
-		$("#btn_start").click( (event) => {
-            event.preventDefault();
-
-			var uart = $("#uart_select").val();
-			ipcRenderer.send('rls:ready:receive', uart);
+			handleWorkFlow.handleReset();
 		});
 
 		// ipcRenderer.send('rls:ready:receive');
 
 
-		ipcRenderer.on('rls:x:data', function (event, x) {
+		// ipcRenderer.on('rls:x:data', function (event, x) {
 
-			if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
-				var labels = [];
-				for(var i = 0; i < 300; i++)
-					labels.push("");
-				chart.data.labels = labels;
-			}
-			chart.data.datasets[0].data.push(x[0]);
-			chart.data.datasets[1].data.push(x[1]);
-			chart.update();
+		// 	if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
+		// 		var labels = [];
+		// 		for(var i = 0; i < 300; i++)
+		// 			labels.push("");
+		// 		chart.data.labels = labels;
+		// 	}
 
-			let x0 = parseFloat(x[0]).toFixed(2);
-			let x1 = parseFloat(x[1]).toFixed(2);
-			var element_xhat = document.getElementById("xhat_value");
-			katex.render(String.raw`  \hat{x}_{k} = \begin{bmatrix} ${x0} \\ ${x1} \end{bmatrix}  `, element_xhat, {
-				displayMode: true,
-				throwOnError: false
-			});
-		});
+		// 	x = x.split(',')
+		// 	chart.data.datasets[0].data.push(x[0]);
+		// 	chart.data.datasets[1].data.push(x[1]);
+		// 	chart.update();
+			
+		// 	let x0 = parseFloat(x[0]).toFixed(2);
+		// 	let x1 = parseFloat(x[1]).toFixed(2);
+
+		// 	var element_xhat = document.getElementById("xhat_value");
+		// 	katex.render(String.raw`  \hat{x}_{k} = \begin{bmatrix} ${x0} \\ ${x1} \end{bmatrix}  `, element_xhat, {
+		// 		displayMode: true,
+		// 		throwOnError: false
+		// 	});
+		// 	ipcRenderer.send('rls:ready:receive');
+		// });
 	});
 
 

@@ -79,7 +79,7 @@ ipcMain.on('inverted_pendulum:tcp:send:state', (event, code, wr, y0, n, h) => {
 
     let dataStr = "";
 
-    if(code == 111) {
+    if(code == 210) {
         wr = new Matrix( wr )
         y0 = new Matrix( y0 )
         // console.log(code, wr, y0, n, h)
@@ -88,11 +88,11 @@ ipcMain.on('inverted_pendulum:tcp:send:state', (event, code, wr, y0, n, h) => {
         let str_y0 = `${y0.get(0, 0)},${y0.get(1, 0)},${y0.get(2, 0)},${y0.get(3, 0)}`
         dataStr = `${code}:${str_wr}:${str_y0}:${n},${h}`
         dataStr = `S${dataStr.length}:${dataStr}E`
-        console.log(dataStr)
+        // console.log(dataStr)
         client.write(dataStr)
     
-    } else if(code == 112) {
-        dataStr = '112:'
+    } else if(code == 211) {
+        dataStr = `${code}:`
         dataStr = `S${dataStr.length}:${dataStr}E`
         client.write(dataStr)
     }

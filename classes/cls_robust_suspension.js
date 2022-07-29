@@ -152,7 +152,7 @@ class HandleWorkFlow {
             drawBackground();
             drawLegends();
             this.controller.init(a, l);
-            this.ipcRenderer.send('robust_suspension:tcp:send:state', 101,
+            this.ipcRenderer.send('robust_suspension:tcp:send:state', 200,
                 this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
             
             return this.windowWidth;
@@ -193,7 +193,7 @@ class HandleWorkFlow {
             if(this.rnd < this.controller.nt - this.controller.ITEM_PER_STEP - 1) {
 
                 this.rnd += this.controller.ITEM_PER_STEP;
-                this.ipcRenderer.send('robust_suspension:tcp:send:state', 102,
+                this.ipcRenderer.send('robust_suspension:tcp:send:state', 201,
                     this.controller.w, this.controller.ms, this.rnd, this.controller.ITEM_PER_STEP );
 
             } else {

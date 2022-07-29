@@ -1,17 +1,12 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
-const  fs = require('fs')
+// const  fs = require('fs')
 const  net = require('net')
+
+// [✓] - Add two Code for PassiveSuspension --> 110, 111
 
 
 let mainWindow;
-// const SERVER_IP = '127.0.0.1';
-// const SERVER_IP = '192.168.1.104';
-// const SERVER_PORT = 5091;
-
-// const UART_DATA_LENGTH = 300;
-// const UART_RECV_LENGTH = 400;
-
 
 module.exports = {
     init,
@@ -63,6 +58,7 @@ function connect(ip, port) {
     client.on('data', function(data) {
 
         data = data.toString();
+        console.log(data)
         mainWindow.webContents.send('estimating_passive_suspension:get:values', data);
     });
     
@@ -77,7 +73,7 @@ ipcMain.on('estimating_passive_suspension:connect', (event, ip, port) => {
     connect(ip, port);
 })
 
-ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, data, rnd, ITEM_PER_STEP) => {
+ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, code, data, rnd, ITEM_PER_STEP) => {
 
     let dataStr = "";
     // const ITEM_PER_STEP = 50;
@@ -89,19 +85,21 @@ ipcMain.on('estimating_passive_suspension:tcp:send:measurements', (event, data, 
         dataStr += data[i];
     }
 
-    dataStr = `101:${dataStr}`
+    dataStr = `${code}:${dataStr}`
+    dataStr = `S${dataStr.length}:${dataStr}E`
+    // dataStr = `S101:${dataStr}E`
     client.write(dataStr)
 })
 
 
 
-function sendCommandUart(data) {
+// function sendCommandUart(data) {
 
-    port.write(data, (err) => {
-        if(err) 
-            console.log('Error on write: ', err.message);
-    });
-}
+//     port.write(data, (err) => {
+//         if(err) 
+//             console.log('Error on write: ', err.message);
+//     });
+// }
 
 // ipcMain.on('estimating_passive_suspension:uart:send:measurements', (event, uart, code, data, rnd, ITEM_PER_STEP) => {
 
