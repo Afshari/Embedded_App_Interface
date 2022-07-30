@@ -51,7 +51,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="">
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="">
                 </div>
             </div>
         </div>
@@ -107,10 +107,9 @@
 
 <script type="text/javascript">
 
-	// const electron = require('electron');
-	// const { ipcRenderer } = electron;
 	var mathjaxHelper = require('mathjax-electron')
 
+	setDefaultValues("ip_id", "port_id")
 	function setWorkflow(txt) {
     	$("#workflow").text(txt)
 	}
@@ -176,13 +175,6 @@
 		handleWorkFlow.setkatex(katex)
 
 
-		// ipcRenderer.on('uart:data', (event, ports) => {
-
-		// 	$('#uart_select').find('option').remove();
-		// 	ports.forEach(function(port){
-		// 		$("#uart_select").append(new Option(port['path'], port['path']));
-		// 	});
-		// });
 		$("#btnConnect").click(function() {
         	handleWorkFlow.handleConnect($('#ip_id').val(), $('#port_id').val());
     	});
@@ -197,34 +189,6 @@
 
 			handleWorkFlow.handleReset();
 		});
-
-		// ipcRenderer.send('rls:ready:receive');
-
-
-		// ipcRenderer.on('rls:x:data', function (event, x) {
-
-		// 	if(typeof chart.data.labels !== "undefined" && chart.data.labels.length < 10) {
-		// 		var labels = [];
-		// 		for(var i = 0; i < 300; i++)
-		// 			labels.push("");
-		// 		chart.data.labels = labels;
-		// 	}
-
-		// 	x = x.split(',')
-		// 	chart.data.datasets[0].data.push(x[0]);
-		// 	chart.data.datasets[1].data.push(x[1]);
-		// 	chart.update();
-			
-		// 	let x0 = parseFloat(x[0]).toFixed(2);
-		// 	let x1 = parseFloat(x[1]).toFixed(2);
-
-		// 	var element_xhat = document.getElementById("xhat_value");
-		// 	katex.render(String.raw`  \hat{x}_{k} = \begin{bmatrix} ${x0} \\ ${x1} \end{bmatrix}  `, element_xhat, {
-		// 		displayMode: true,
-		// 		throwOnError: false
-		// 	});
-		// 	ipcRenderer.send('rls:ready:receive');
-		// });
 	});
 
 

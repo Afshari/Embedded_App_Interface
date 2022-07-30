@@ -1,23 +1,12 @@
 
-const { app, BrowserWindow, ipcMain } = require('electron');
-const ejse = require('ejs-electron');
+const { ipcMain } = require('electron');
+// const ejse = require('ejs-electron');
 
 const  net = require('net');
-// const  SerialPort = require('serialport');
-// const  ByteLength = require('@serialport/parser-byte-length');
-
-// [✓] - Create a file in cls directory for kf_tracking
-// [✓] - Test TCP Connection
-// [✓] - Create a function for TCP Connect
-// [✓] - Send TCP Connect Request from ejs to backend js
-// [✓] - Find Init Code & Send Measurement Code
-// [✓] - Create a class for HandleDraw
-
 
 var mainWindow;
 var _isActive = false;
 var _isConnected = false;
-// let intervalObj;
 
 
 module.exports = {
@@ -27,9 +16,9 @@ module.exports = {
 }
 		
 
-function isActive() {
-    return _isActive;
-}
+function isActive() { return _isActive; }
+
+function deactivate() { _isActive = false; }
 
 function deactivate() {
 
@@ -39,7 +28,7 @@ function deactivate() {
     if(_isConnected == true) {
 
         _isConnected = false;
-        client.write('29:-');
+        // client.write('29:-');
         client.end();
         client.destroy();
     }
@@ -53,16 +42,6 @@ function init(win) {
 }
 
 
-function deactivate() {
-    _isActive = false;
-	// clearInterval(intervalObj);
-}
-
-function isActive() {
-    return _isActive;
-}
-
-
 var client;
 
 function connect(ip, port) {
@@ -70,6 +49,7 @@ function connect(ip, port) {
     client = new net.Socket();
 
     client.on('error', function(ex) {
+        _isConnected = false;
         mainWindow.webContents.send('kf_tracking:connection:fail');
     });
 
@@ -82,6 +62,7 @@ function connect(ip, port) {
     client.on('data', function(data) {
 
         data = data.toString();
+        // console.log(data);
     
         if(data === "corrupted") {
             mainWindow.webContents.send('kf_tracking:result', -1, -1);
@@ -96,6 +77,7 @@ function connect(ip, port) {
     
     client.on('close', function() {
         _isConnected = false;
+        mainWindow.webContents.send('kf_tracking:connection:fail');
         console.log('Connection closed');
     });
 }

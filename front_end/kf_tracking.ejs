@@ -9,7 +9,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="">
                 </div>
             </div>
         </div>
@@ -18,7 +18,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="">
                 </div>
             </div>
         </div>
@@ -120,6 +120,7 @@
 
 <script type="text/javascript">
 
+setDefaultValues("ip_id", "port_id")
 function setWorkflow(txt) {
     $("#workflow").text(txt)
 }
@@ -141,9 +142,6 @@ var std_x  = 0.1;
 var std_y  = 0.1;
 var process_noise  = 1;
 var dt  = 0.1;
-
-
-var measurement = []
 
 $(document).ready( () => {
 
@@ -213,7 +211,7 @@ function moveY(y) {
     return windowHeight  - (y * scl) - 10
 }
 
-var shouldDraw = false
+// var shouldDraw = false
 var points = []
 var clutters = []
 var pathMeasurements = []

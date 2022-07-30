@@ -1,19 +1,26 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
-const contextMenu = require('electron-context-menu');
-const fs = require('fs');
-const lineReader = require('line-reader');
-var linearAlgebra = require('linear-algebra')(),  
-					Vector = linearAlgebra.Vector,
-					Matrix = linearAlgebra.Matrix;
 
-// [✓] - Change default page 
-// [✓] - Print Inverted_Pendulum Initialization
-// [✓] - Print Each Step of Inverted_Pendulum
-// [✓] - Create StateMachine for InvertedPendulum
-// [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
-// [✓] - Create StateMachine for RobustSuspension
 
+// [ ] - For All Finished Applications correct StateMachine to Stop when Connection Lost
+// [ ] -	KF Tracking
+// [ ] -	RLS
+// [ ] - 	KF Passive Suspension
+// [ ] - 	Inverted Pendulum
+// [ ] -	Robust Suspension
+// [ ] - Cleanup All Finished Applications
+// [✓] -	KF Tracking
+// [✓] -	RLS
+// [✓] - 	KF Passive Suspension
+// [ ] - 	Inverted Pendulum
+// [ ] -	Robust Suspension
+
+// [ ] - Change Structure of RLS to send multiple data in one package
+// [ ] - Change Structure of KF Tracking to send multiple data in one package
+
+
+global.server_ip = "127.0.0.1"
+global.server_port = "5091"
 
 const sot = require('./sot');
 const rls = require('./rls');
@@ -131,18 +138,13 @@ ipcMain.on("menu:page:change", function(event, addr) {
 	}
 
 	lastPage = addr;
-
 })
 
-
-// ipcMain.on('uart:reload', (event) => {
-	
-// 	SerialPort.list().then(function(ports){
-// 		// console.log(ports)
-// 		event.reply('uart:data', ports);
-// 	});
-// });
-
+ipcMain.on("defaults:set:data", (event, ip, port) => {
+	global.server_ip = ip;
+	global.server_port = port;
+	win.webContents.send('defaults:set:result', true);
+});
 
 
 app.whenReady().then(function() {

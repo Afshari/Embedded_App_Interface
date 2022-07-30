@@ -9,28 +9,16 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Simulation Time</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="time_id" value="12">
+                    <input class="form-control" id="time_id" value="7">
                 </div>
             </div>
         </div>
-
-        <!-- <div class="row mt">
-            <div class="form-group form-horizontal">
-                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Connection Type</label>
-                <div class="col-sm-4" style="padding-left: 0px;">
-                    <select class="form-control" id="connection_type" style="padding-left: 0px;">
-                        <option value="uart">UART</option>
-                        <option value="tcp">TCP/IP</option>
-                    </select>
-                </div>
-            </div>
-        </div> -->
 
         <div class="row mt" id="ip_div_id">
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="">
                 </div>
             </div>
         </div>
@@ -39,21 +27,10 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="">
                 </div>
             </div>
         </div>
-
-        <!-- <div class="row mt" id="uart_div_id">
-            <div class="form-group form-horizontal">
-                <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">UART</label>
-                <div class="col-sm-4" style="padding-left: 0px;">
-                    <select class="form-control" id="uart_select" style="padding-left: 0px;">
-                    </select>
-                </div>
-                <button type="button" class="btn btn-primary" id="reloadUart">Reload</button>
-            </div>
-        </div> -->
 
         </div>
         <!-- /form-panel -->
@@ -81,6 +58,7 @@
 
 <script type="text/javascript">
 
+setDefaultValues("ip_id", "port_id")
 function setWorkflow(txt) {
     $("#workflow").text(txt)
 }
@@ -98,11 +76,9 @@ const halfWidth     = windowWidth / 2;
 
 
 var estimator = new SuspensionEstimator();
-// estimator.init();
 const drawHelper = new DrawHelper(estimator, windowWidth);
 
 var handleWorkFlow = new HandleWorkFlow(estimator, ipcRenderer, windowWidth, showFlashMessage, setWorkflow);
-// console.log( handleWorkFlow );
 
 
 $(document).ready( () => {

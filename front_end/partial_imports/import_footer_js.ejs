@@ -47,19 +47,22 @@
 <script type="text/javascript">
 
   const electron = require('electron');
-  const { ipcRenderer } = electron;
+  const { ipcRenderer, remote } = electron;
 
   ipcRenderer.on('message:show', function (event, message, message_type) {
 
     showFlashMessage(message, message_type);
-  // if(status == 'connected') {
-  //     $('#span_detectron_status').text('connected')
-  //     $('#span_detectron_status').removeClass("bg-warning").addClass("bg-info")
-  // }
-
+    // if(status == 'connected') {
+    //     $('#span_detectron_status').text('connected')
+    //     $('#span_detectron_status').removeClass("bg-warning").addClass("bg-info")
+    // }
   })
 
+  function setDefaultValues(ip_id, port_id) {
 
+    $(`#${ip_id}`).val(remote.getGlobal("server_ip"));
+    $(`#${port_id}`).val(remote.getGlobal("server_port"));
+  }
 
   function showFlashMessage(message, message_type) {
 

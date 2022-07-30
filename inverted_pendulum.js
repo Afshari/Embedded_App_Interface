@@ -1,6 +1,6 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { app, BrowserWindow, ipcMain } = require('electron')
-const  fs = require('fs')
+// const  fs = require('fs')
 const net = require('net')
 const { Matrix } = require('ml-matrix');
 
@@ -20,7 +20,6 @@ var _isConnected = false;
 function init(win) {
 
     mainWindow = win
-
 }
 
 function isActive() {

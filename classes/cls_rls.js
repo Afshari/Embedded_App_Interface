@@ -1,12 +1,7 @@
 
 var linearAlgebra = require('linear-algebra')(),
-                    Vector = linearAlgebra.Vector,
+                    // Vector = linearAlgebra.Vector,
                     Matrix = linearAlgebra.Matrix;
-
-
-// [ ] - Create a class for Data Genertion --> RLSDataGenerator
-// [ ] - Complete State Machine
-// [ ] - 
 
 
 let State = Object.freeze({
@@ -100,7 +95,7 @@ class HandleWorkFlow {
 				throwOnError: false
 			});
 
-            if(that.data_generator.hasData() == true) {
+            if(that.data_generator.hasData() == true && that.state == State.Running) {
                 that.ipcRenderer.send('rls:send:data', that.data_generator.getCode(), that.data_generator.generateData());
             } else {
                 that.state = rules[that.state][Trigger.ComputationCompleted]
@@ -187,7 +182,6 @@ class RLSDataGenerator {
     generateData() {
 
         if(this.k === 1) {
-            //sendCommandTCP(100, `${xhat.data[0]},${xhat.data[1]},${R.data[0][0].toFixed(4)}`);
             this.k += 1;
             return `${this.xhat.data[0]},${this.xhat.data[1]},${this.R.data[0][0].toFixed(4)}`;
         } else {
@@ -201,7 +195,6 @@ class RLSDataGenerator {
             let strH2 = H.data[0][1].toFixed(2).toString();
             let strY = y.data[0][0].toFixed(2).toString();
     
-            //sendCommandTCP(101, `${strH1},${strH2},${strY}`);
             this.k += 1;
             return `${strH1},${strH2},${strY}`
         }

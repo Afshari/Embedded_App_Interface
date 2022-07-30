@@ -55,7 +55,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="">
                 </div>
             </div>
         </div>
@@ -64,7 +64,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="">
                 </div>
             </div>
         </div>
@@ -103,8 +103,9 @@
 
 <script type="text/javascript">
 
-
 const { Matrix } = require('ml-matrix');
+
+setDefaultValues("ip_id", "port_id")
 
 const { InvertedPendulum, HandleWorkFlow } = require('../classes/cls_inverted_pendulum');
 
@@ -217,10 +218,10 @@ function drawCart( x, th ) {
 
     fill(0)
     ellipseMode(CENTER)
-    circle( pendx, pendy, mr, mr )
+    circle(pendx, pendy, mr)
 
-    circle(x - 0.9 * W/2+wr/2, H+wr/2, wr, wr)
-    circle(x + 0.9 * W/2-wr/2, H+wr/2, wr, wr)
+    circle(x - 0.9 * W/2+wr/2, H+wr/2, wr)
+    circle(x + 0.9 * W/2-wr/2, H+wr/2, wr)
     pop();
 }
 

@@ -1,21 +1,16 @@
 
 var linearAlgebra = require('linear-algebra')(),
-                    Vector = linearAlgebra.Vector,
                     Matrix = linearAlgebra.Matrix;
 
 var Enum = require('enum');
 
-// [✓] - Remove Uart Elements
-// [✓] - Create States
-// [✓] - Create Triggers
-// [✓] - Create Rules
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
-    Connecting:                     'Connecting',
+    Connecting:                     'Connecting ...',
     Connected:                      'Connected',
     Ready:                          'Ready to Run',
-    Running:                        'Calculating',
+    Running:                        'Calculating ...',
     Drawing:                        'Visualizing Result',
     DrawFinished:                   'Visualization Finished',
     Pause:                          'Paused',
@@ -93,7 +88,7 @@ class SuspensionEstimator {
     init( tm ) {
 
         const dt = 0.001;
-        this.ITEM_PER_STEP = 10;
+        this.ITEM_PER_STEP = 20;
         this.Tf = tm;
         // this.Tf = 3;
         this.n = this.Tf / dt;
@@ -194,8 +189,7 @@ class HandleWorkFlow {
         this.showFlashMessage   = showFlashMessage;
         this.setWorkflow        = setWorkflow;
         this.rnd                = 0;
-        // this.connection_type = "";
-        // this.uart = "";
+
 
         this.ipcRenderer.on('estimating_passive_suspension:connection:fail', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionFail]
@@ -228,9 +222,7 @@ class HandleWorkFlow {
     handleReplay(counter) {
 
         if(this.state == State.Drawing) {
-            console.log(this.state)
             this.state = rules[this.state][Trigger.Replay]
-            console.log(this.state)
             this.setWorkflow(this.state)
             return this.windowWidth;
         } else if(this.state == State.DrawFinished) {
@@ -259,7 +251,6 @@ class HandleWorkFlow {
 
         if(this.state == State.Ready || this.state == State.Connected) {
 
-            console.log("Run")
             this.state = rules[this.state][Trigger.SendData]
             this.setWorkflow(this.state)
             this.rnd = 0;
@@ -299,12 +290,12 @@ class HandleWorkFlow {
             if(this.rnd < this.estimator.n - this.estimator.ITEM_PER_STEP - 1) {
 
                 this.rnd += this.estimator.ITEM_PER_STEP;
-                this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
+                if(this.state == State.Running)
+                    this.ipcRenderer.send('estimating_passive_suspension:tcp:send:measurements', 121, estimator.Y.data[0], this.rnd, this.estimator.ITEM_PER_STEP);
             } else {
     
                 this.state = rules[this.state][Trigger.ComputationCompleted]
                 this.setWorkflow(this.state)
-                // this.state2Running();
                 window.frameRate(40);
             }
         } 

@@ -110,7 +110,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">IP</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="127.0.0.1">
+                    <input class="form-control" id="ip_id" placeholder="127.0.0.1" value="">
                 </div>
             </div>
         </div>
@@ -119,7 +119,7 @@
             <div class="form-group form-horizontal">
                 <label class="col-sm-2 control-label"  style="padding-left: 20px; width: 16%;">Port</label>
                 <div class="col-sm-4" style="padding-left: 0px;">
-                    <input class="form-control" id="port_id" placeholder="5091" value="5091">
+                    <input class="form-control" id="port_id" placeholder="5091" value="">
                 </div>
             </div>
         </div>
@@ -287,6 +287,7 @@ var handleWorkFlow = new HandleWorkFlow(controller, ipcRenderer, windowWidth, sh
 
 $(document).ready( () => {
 
+    setDefaultValues("ip_id", "port_id")
     $("#btnConnect").click( () => {
         handleWorkFlow.handleConnect( $('#ip_id').val(), $('#port_id').val() );
     });

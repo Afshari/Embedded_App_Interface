@@ -5,61 +5,20 @@
         <p class="centered"><a href="profile.html"><img src="img/iot2.png" class="img-circle" width="80"></a></p>
         <h5 class="centered">Interface Application</h5>
         <br />
-        <!-- <li class="mt">
-            <a href="index.html">
-            <i class="fa fa-dashboard"></i>
-            <span>Dashboard</span>
-            </a>
-        </li> -->
-        <!-- <li class="sub-menu">
-            <a href="javascript:;">
-            <i class="fa fa-desktop"></i>
-            <span>UI Elements</span>
-            </a>
-            <ul class="sub">
-            <li><a href="general.html">General</a></li>
-            <li><a href="buttons.html">Buttons</a></li>
-            <li><a href="panels.html">Panels</a></li>
-            <li><a href="font_awesome.html">Font Awesome</a></li>
-            </ul>
-        </li> -->
-        <!-- <li class="sub-menu">
-            <a href="javascript:;">
-            <i class="fa fa-cogs"></i>
-            <span>Components</span>
-            </a>
-            <ul class="sub">
-            <li><a href="grids.html">Grids</a></li>
-            <li><a href="calendar.html">Calendar</a></li>
-            <li><a href="gallery.html">Gallery</a></li>
-            <li><a href="todo_list.html">Todo List</a></li>
-            <li><a href="dropzone.html">Dropzone File Upload</a></li>
-            <li><a href="inline_editor.html">Inline Editor</a></li>
-            <li><a href="file_upload.html">Multiple File Upload</a></li>
-            </ul>
-        </li> -->
         <li class="sub-menu">
             <a class="<%= (PageAddr == 'ids' || PageAddr == 'rls' || PageAddr == 'a_star') ? 'active' : '' %>" href="javascript:;">
-            <i class="fa fa-book"></i>
-            <span>Main Applications</span>
+            <i class="fa fa-th"></i>
+            <span>General Applications</span>
             </a>
             <ul class="sub">
-            <!-- <li class="<%= PageAddr == 'spamfilter' ? 'active' : '' %>"><a href="spam_filter.ejs" class="sidebar_item">Spam Filter</a></li> -->
             <li class="<%= PageAddr == 'ids' ? 'active' : '' %>" ><a href="lite_ids.ejs" class="sidebar_item">Intrusion Detection System</a></li>
             <li class="<%= PageAddr == 'rls' ? 'active' : '' %>"><a href="rls.ejs" class="sidebar_item">Recursive Least Squares</a></li>
-            <!-- <li class="<%= PageAddr == 'kalman_filter' ? 'active' : '' %>"><a href="kalmanfilter.ejs" class="sidebar_item">Kalman Filter</a></li> -->
             <li class="<%= PageAddr == 'a_star' ? 'active' : '' %>"><a href="a_star.ejs" class="sidebar_item">Path Finding A*</a></li>
-            <!-- <li><a href="profile.html">Profile</a></li>
-            <li><a href="invoice.html">Invoice</a></li>
-            <li><a href="pricing_table.html">Pricing Table</a></li>
-            <li><a href="faq.html">FAQ</a></li>
-            <li><a href="404.html">404 Error</a></li>
-            <li><a href="500.html">500 Error</a></li> -->
             </ul>
         </li>
         <li class="sub-menu">
             <a class="<%= (PageAddr == 'ekf_localization' || PageAddr == 'pf_localization') ? 'active' : '' %>" href="javascript:;">
-            <i class="fa fa-tasks"></i>
+            <i class="fa fa-globe"></i>
             <span>Localization</span>
             </a>
             <ul class="sub">
@@ -69,7 +28,7 @@
         </li>
         <li class="sub-menu">
             <a class="<%= (PageAddr == 'kf_passive_suspension' || PageAddr == 'robust_suspension') ? 'active' : '' %>" href="javascript:;">
-            <i class="fa fa-th"></i>
+            <i class="fa fa-car"></i>
             <span>Suspension</span>
             </a>
             <ul class="sub">
@@ -79,7 +38,7 @@
         </li>
         <li class="sub-menu">
             <a class="<%= (PageAddr == 'inverted_pendulum') ? 'active' : '' %>" href="javascript:;">
-            <i class="fa fa-th"></i>
+            <i class="fa fa-gears"></i>
             <span>Controller</span>
             </a>
             <ul class="sub">
@@ -88,7 +47,7 @@
         </li>
         <li class="sub-menu">
             <a class="<%= (PageAddr == 'sot' || PageAddr == 'detectron_tracking' || PageAddr == 'siamfc' || PageAddr == 'kf_tracking') ? 'active' : '' %>" href="javascript:;">
-            <i class=" fa fa-tasks"></i>
+            <i class=" fa fa-map-pin"></i>
             <span>Tracking</span>
             </a>
             <ul class="sub">
@@ -98,22 +57,15 @@
                 <li class="<%= PageAddr == 'kf_tracking' ? 'active' : '' %>"><a href="kf_tracking.ejs" class="sidebar_item">Tracking with Kalman Filter</a></li>
             </ul>
         </li>
-        <!-- <li class="sub-menu">
-            <a href="javascript:;">
-            <i class="fa fa-comments-o"></i>
-            <span>Chat Room</span>
+        <li class="sub-menu">
+            <a class="<%= (PageAddr == 'settings') ? 'active' : '' %>" href="javascript:;">
+            <i class="fa fa-sliders"></i>
+            <span>Settings</span>
             </a>
             <ul class="sub">
-            <li><a href="lobby.html">Lobby</a></li>
-            <li><a href="chat_room.html"> Chat Room</a></li>
+                <li class="<%= PageAddr == 'settings' ? 'active' : '' %>"><a href="settings.ejs" class="sidebar_item">Settings</a></li>
             </ul>
-        </li> -->
-        <!-- <li>
-            <a href="google_maps.html">
-            <i class="fa fa-map-marker"></i>
-            <span>Google Maps </span>
-            </a>
-        </li> -->
+        </li>
         </ul>
         <!-- sidebar menu end-->
     </div>

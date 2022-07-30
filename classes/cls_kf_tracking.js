@@ -2,8 +2,6 @@
 const { Matrix } = require('ml-matrix');
 
 
-// [✓] - Create disable & enable function for DrawHelper
-
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
@@ -156,25 +154,8 @@ class HandleWorkFlow {
 
     sendData(code, params) {
 
-        this.ipcRenderer.send('kf_tracking:tcp:send:measurements', code, params);
-    }
-
-    getWidthHeightOrient(covar, HH) {
-
-        var e = new EigenvalueDecomposition( HH.mmul( covar.mmul( HH.transpose() ) ) );
-        var w = e.realEigenvalues;
-        // console.log(w)
-        var v = e.eigenvectorMatrix;
-        // console.log(v)
-        max_ind = this.arrayMaxIndex(w)
-        min_ind = this.arrayMinIndex(w)
-    
-        var width  = 2 * Math.sqrt(w[max_ind])
-        var height = 2 * Math.sqrt(w[min_ind])
-    
-        var orientation = Math.atan2( v.data[1][max_ind], v.data[0][max_ind])
-        
-        return { width: width, height: height, orientation: orientation }
+        if(this.state == State.Running)
+            this.ipcRenderer.send('kf_tracking:tcp:send:measurements', code, params);
     }
 
     handleConnect(ip, port) {
