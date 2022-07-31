@@ -1,6 +1,6 @@
 
+
 var linearAlgebra = require('linear-algebra')(),
-                    // Vector = linearAlgebra.Vector,
                     Matrix = linearAlgebra.Matrix;
 
 
@@ -61,9 +61,12 @@ class HandleWorkFlow {
         this.data_generator = new RLSDataGenerator();
 
         this.ipcRenderer.on('rls:connection:fail', (event, values) => {
-            this.state = rules[this.state][Trigger.ConnectionFail]
-            this.setWorkflow(this.state)
-            this.showFlashMessage("Connection Lost", "ERROR")
+
+            if(this.state != State.NotConnected) {
+                this.state = rules[this.state][Trigger.ConnectionFail]
+                this.setWorkflow(this.state)
+                this.showFlashMessage("Connection Lost", "ERROR")
+            }
         });
         this.ipcRenderer.on('rls:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]
@@ -164,10 +167,11 @@ class RLSDataGenerator {
 
     initialize() {
 
-        this.k          = 1;
-        this.R          = new Matrix([[ 0.1 ]]);
-        this.xhat       = new Matrix([[8], [7]]);
-        this.x          = new Matrix([[10], [5]]);
+        this.k              = 1;
+        this.R              = new Matrix([[ 0.1 ]]);
+        this.xhat           = new Matrix([[8], [7]]);
+        this.x              = new Matrix([[10], [5]]);
+        this.MAX_COUNTER    = 120;
     }
 
     getCode() {
@@ -176,7 +180,7 @@ class RLSDataGenerator {
     }
 
     hasData() {
-        return (this.k < 150);
+        return (this.k < this.MAX_COUNTER);
     }
 
     generateData() {

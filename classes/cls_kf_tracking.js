@@ -5,10 +5,10 @@ const { Matrix } = require('ml-matrix');
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
-    Connecting:                     'Connecting',
+    Connecting:                     'Connecting ...',
     Connected:                      'Connected',
     Ready:                          'Ready to Run',
-    Running:                        'Calculating',
+    Running:                        'Calculating ...',
     Visualization:                  'Visualization',
 });
 
@@ -40,6 +40,7 @@ rules[State.Ready] = {
     ConnectionFail:     State.NotConnected
 };
 rules[State.Running] = {
+    Reset:                  State.Ready,
     ComputationCompleted:   State.Visualization,
     ConnectionFail:         State.NotConnected
 };
@@ -73,7 +74,6 @@ draw_rules[DrawState.Ready] = {
 }
 draw_rules[DrawState.SetInit] = {
     PointAdded:             DrawState.Ready,
-    // Draw:                   DrawState.Drawing,
     Disable:                DrawState.Disabled,
 }
 draw_rules[DrawState.Drawing] = {
@@ -82,7 +82,6 @@ draw_rules[DrawState.Drawing] = {
 draw_rules[DrawState.Disabled] = {
     Enable:                 DrawState.Ready
 }
-
 
 class HandleWorkFlow {
 
@@ -101,6 +100,7 @@ class HandleWorkFlow {
         this.groundTruthX = 0
         this.groundTruthY = 0
         this.CLUTTER_PER_STEP = 1;
+        this.ITEM_PER_STEP = 15;
 
         this.init_x = 0;
         this.init_y = 0;
@@ -120,9 +120,12 @@ class HandleWorkFlow {
         };
 
         this.ipcRenderer.on('kf_tracking:connection:fail', (event, values) => {
-            this.state = rules[this.state][Trigger.ConnectionFail]
-            this.setWorkflow(this.state)
-            this.showFlashMessage("Connection Lost", "ERROR")
+
+            if(this.state != State.NotConnected) {
+                this.state = rules[this.state][Trigger.ConnectionFail]
+                this.setWorkflow(this.state)
+                this.showFlashMessage("Connection Lost", "ERROR")
+            }
         });
         this.ipcRenderer.on('kf_tracking:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]
@@ -130,24 +133,33 @@ class HandleWorkFlow {
             this.showFlashMessage("Successfully Connected to the Server", "INFO")
         });
 
-        this.ipcRenderer.on('kf_tracking:result', (event, x, y) => {
+        this.ipcRenderer.on('kf_tracking:result', (event, data) => {
 
-            if(x == -1 && y == -1) {
-    
-                this.sendData(101, pathMeasurements[this.stepPointer]);
-    
-            } else {
-    
+            data = data.split(";")
+            for(var i = 0; i < data.length; i++) {
+                
+                var curr_data = data[i].split(',')
+                var x = parseInt(curr_data[0])
+                var y = parseInt(curr_data[1])
                 this.kfResults.push([x, y])
-                if(this.state == State.Running && this.stepPointer < this.pathMeasurements.length - 1) {
-    
-                    this.stepPointer += 1;
-                    this.sendData(111, this.pathMeasurements[this.stepPointer]);
-    
-                } else {
-                    this.state = rules[this.state][Trigger.ComputationCompleted]
-                    this.setWorkflow(this.state)
+            }
+
+            if(this.state == State.Running && this.stepPointer < this.pathMeasurements.length - 1) {
+
+                var diff = Math.min(this.ITEM_PER_STEP, this.pathMeasurements.length - this.stepPointer)
+                var meas = "";
+                for(var i = this.stepPointer; i < (diff + this.stepPointer); i++) {
+                    if(meas != "")  meas += ";";
+                    var curr_meas = this.pathMeasurements[i];
+                    meas += `${curr_meas[0]},${curr_meas[1]}`
                 }
+                this.stepPointer += diff;
+                // console.log(meas)
+                this.sendData(111, meas);
+
+            } else if(this.state == State.Running) {
+                this.state = rules[this.state][Trigger.ComputationCompleted]
+                this.setWorkflow(this.state)
             }
         })
     }
@@ -190,10 +202,10 @@ class HandleWorkFlow {
         }
     }
     canReset() {
-        return this.state == State.Visualization;
+        return this.state == State.Visualization || this.state == State.Running;
     }
     setReady() {
-        if(this.state == State.Visualization) {
+        if(this.canReset() == true) {
             this.state = rules[this.state][Trigger.Reset]
             this.drawHelper.enable();
             this.setWorkflow(this.state)

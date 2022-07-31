@@ -298,22 +298,16 @@ $(document).ready( () => {
         handleWorkFlow.handleReset();
     });
     $("#btnPause").click( () => {
-        //handleWorkFlow.isReadyToDraw = !handleWorkFlow.isReadyToDraw;
+        
         handleWorkFlow.handlePause();
     });
     $("#btnRun").click( () => {
 
-        // handleWorkFlow.isReadyToDraw = false;
-        // counter = windowWidth
-        // drawBackground();
-        // drawLegends();
-        // controller.init(a, l);
         counter = handleWorkFlow.handleRun(counter, a, l, drawBackground, drawLegends);
     });
     $("#btnShowTime").click( () => {
         showTimeLines = !showTimeLines;
 
-        // if(handleWorkFlow.isReadyToDraw == false) {
         if(handleWorkFlow.isDrawing() == false) {
             drawMainView();
         }
@@ -323,17 +317,10 @@ $(document).ready( () => {
 
 
 var counter = windowWidth;
-// var isReadyToDraw = false;
 var showTimeLines = false;
 
 var time = 0;
 var dt = 0;
-
-// ipcRenderer.on('robust_suspension:get:values', (event, values) => {
-
-//     handleWorkFlow.handleReceivedValues( values );
-// })
-
 
 function drawLegends() {
 
@@ -390,7 +377,6 @@ function drawMainView() {
     if(showTimeLines == true)
         drawTimeLines();
 
-    // console.log( controller.x_suspension.length )
     if( controller.isDataReady() ) {
 
         translate(0, 3*height/4);
@@ -407,9 +393,6 @@ function drawMainView() {
             point(i - firstValue, controller.getActiveTyre(i));
 
         }
-
-        // controller.drawZr( counter, windowWidth );
-        // controller.drawZrdot( counter, windowWidth );
 
         if(showPassive)
             drawHelper.drawPassive( counter );
@@ -429,7 +412,6 @@ function setup() {
 
 function draw() {
 
-    // if(handleWorkFlow.isReadyToDraw == true) {
     if(handleWorkFlow.isDrawing() == true) {
 
         drawMainView();

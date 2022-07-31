@@ -54,13 +54,17 @@ function connect(ip, port) {
     client = new net.Socket();
 
     client.on('error', function(ex) {
+        _isConnected = false;
+        mainWindow.webContents.send('robust_suspension:connection:fail');
+    });
+    client.on('close', function() {
+        _isConnected = false;
         mainWindow.webContents.send('robust_suspension:connection:fail');
     });
 
     client.connect(port, ip, function() {
         _isConnected = true;
         mainWindow.webContents.send('robust_suspension:connection:pass');
-        console.log("Connected");
     });
 
     client.on('data', function(data) {

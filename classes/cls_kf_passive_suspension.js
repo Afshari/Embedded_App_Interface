@@ -192,9 +192,12 @@ class HandleWorkFlow {
 
 
         this.ipcRenderer.on('estimating_passive_suspension:connection:fail', (event, values) => {
-            this.state = rules[this.state][Trigger.ConnectionFail]
-            this.setWorkflow(this.state)
-            this.showFlashMessage("Connection Lost", "ERROR")
+
+            if(this.state != State.NotConnected) {
+                this.state = rules[this.state][Trigger.ConnectionFail]
+                this.setWorkflow(this.state)
+                this.showFlashMessage("Connection Lost", "ERROR")
+            }
         });
         this.ipcRenderer.on('estimating_passive_suspension:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]

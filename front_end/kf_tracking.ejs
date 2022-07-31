@@ -211,7 +211,6 @@ function moveY(y) {
     return windowHeight  - (y * scl) - 10
 }
 
-// var shouldDraw = false
 var points = []
 var clutters = []
 var pathMeasurements = []
@@ -342,7 +341,7 @@ function addMeasurementToPath() {
 
     pathMeasurements = []
     points.forEach(function(p, index, array) {
-        pathMeasurements.push( [ parseInt( p[0] + random(-30, 30) ), parseInt( p[1] + random(-30, 30) ) ] )
+        pathMeasurements.push( [ parseInt( p[0] + random(-15, 15) ), parseInt( p[1] + random(-15, 15) ) ] )
     })
 }
 

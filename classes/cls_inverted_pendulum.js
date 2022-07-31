@@ -2,20 +2,16 @@
 const THREE = require('three');
 const { Matrix } = require('ml-matrix');
 
-// [✓] - Write Down All Steps for StateMachine --> (NotConnected, Connected, ReadyToRun, Running, GotResult)
-// [✓] - Show Error Message with Modal
-
-
 
 var Enum = require('enum');
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
-    Connecting:                     'Connecting',
+    Connecting:                     'Connecting ...',
     Connected:                      'Connected',
     ConnectionCheck:                'Connection Check',
     Ready:                          'Ready to Run',
-    Running:                        'Calculating',
+    Running:                        'Calculating ...',
     Drawing:                        'Visualizing Result',
     DrawFinished:                   'Visualization Finished',
 });
@@ -162,9 +158,12 @@ class HandleWorkFlow {
         this.counter_remote     = -40
 
         this.ipcRenderer.on('inverted_pendulum:connection:fail', (event, values) => {
-            this.state = rules[this.state][Trigger.ConnectionFail]
-            this.setWorkflow(this.state)
-            this.showFlashMessage("Connection Lost", "ERROR")
+
+            if(this.state != State.NotConnected) {
+                this.state = rules[this.state][Trigger.ConnectionFail]
+                this.setWorkflow(this.state)
+                this.showFlashMessage("Connection Lost", "ERROR")
+            }
         });
         this.ipcRenderer.on('inverted_pendulum:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]

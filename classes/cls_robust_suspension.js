@@ -1,15 +1,14 @@
 
-// const THREE = require('three');
 const { Matrix } = require('ml-matrix');
 
 var Enum = require('enum');
 
 let State = Object.freeze({
     NotConnected:                   'Disconnect',
-    Connecting:                     'Connecting',
+    Connecting:                     'Connecting ...',
     Connected:                      'Connected',
     Ready:                          'Ready to Run',
-    Running:                        'Calculating',
+    Running:                        'Calculating ...',
     Drawing:                        'Visualizing Result',
     DrawFinished:                   'Visualization Finished',
     Pause:                          'Paused',
@@ -89,9 +88,12 @@ class HandleWorkFlow {
         this.setWorkflow        =   setWorkflow;
 
         this.ipcRenderer.on('robust_suspension:connection:fail', (event, values) => {
-            this.state = rules[this.state][Trigger.ConnectionFail]
-            this.setWorkflow(this.state)
-            this.showFlashMessage("Connection Lost", "ERROR")
+
+            if(this.state != State.NotConnected) {
+                this.state = rules[this.state][Trigger.ConnectionFail]
+                this.setWorkflow(this.state)
+                this.showFlashMessage("Connection Lost", "ERROR")
+            }
         });
         this.ipcRenderer.on('robust_suspension:connection:pass', (event, values) => {
             this.state = rules[this.state][Trigger.ConnectionPass]

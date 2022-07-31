@@ -32,6 +32,10 @@ function connect(ip, port) {
         _isConnected = false;
         mainWindow.webContents.send('rls:connection:fail');
     });
+    client.on('close', function() {
+        _isConnected = false;
+        mainWindow.webContents.send('rls:connection:fail');
+    });
 
     client.connect(port, ip, function() {
         _isConnected = true;
@@ -44,12 +48,6 @@ function connect(ip, port) {
         // console.log(data);
 		mainWindow.webContents.send('rls:receive:result', data);
 	});
-	
-	client.on('close', function() {
-        _isConnected = false;
-        mainWindow.webContents.send('rls:connection:fail');
-        console.log('Connection closed');
-    });
 }
 
 ipcMain.on('rls:tcp:connect', (event, ip, port) => {

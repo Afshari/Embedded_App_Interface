@@ -1,4 +1,4 @@
-// const { SSL_OP_EPHEMERAL_RSA } = require('constants');
+
 const { ipcMain } = require('electron')
 const  net = require('net')
 
@@ -43,6 +43,10 @@ function connect(ip, port) {
         _isConnected = false;
         mainWindow.webContents.send('estimating_passive_suspension:connection:fail');
     });
+    client.on('close', function() {
+        _isConnected = false;
+        mainWindow.webContents.send('estimating_passive_suspension:connection:fail');
+    });
 
     client.connect(port, ip, function() {
         _isConnected = true;
@@ -53,13 +57,8 @@ function connect(ip, port) {
     client.on('data', function(data) {
 
         data = data.toString();
+        // console.log(data);
         mainWindow.webContents.send('estimating_passive_suspension:get:values', data);
-    });
-    
-    client.on('close', function() {
-        _isConnected = false;
-        mainWindow.webContents.send('estimating_passive_suspension:connection:fail');
-        console.log('Connection closed');
     });
 }
 

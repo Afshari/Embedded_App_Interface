@@ -114,15 +114,12 @@ const ref_pos = new Matrix( [ [0, 0, Math.PI, 0] ] ).transpose()
 var t = []
 var inverted_pendulum = new InvertedPendulum( x0, ref_pos, t );
 
-// var isReadyToDraw = false
 const n_ = 10000;
 const h_ = 0.001;
-
 
 function calcPendulum() {
 
     inverted_pendulum.rungekutta4(x0, h_, n_)
-    // counter = 0
     isReadyToDraw = true;
 }
 
@@ -134,7 +131,7 @@ const windowWidth   = 1200;
 const windowHeight  = 600;
 const halfWidth     = windowWidth / 2;
 
-var handleWorkFlow = new HandleWorkFlow( inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage, setWorkflow );
+var handleWorkFlow = new HandleWorkFlow(inverted_pendulum, ipcRenderer, windowWidth, showFlashMessage, setWorkflow);
 
 
 $(document).ready( () => {

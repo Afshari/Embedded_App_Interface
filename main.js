@@ -2,21 +2,21 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const ejse = require('ejs-electron');
 
 
-// [ ] - For All Finished Applications correct StateMachine to Stop when Connection Lost
-// [ ] -	KF Tracking
-// [ ] -	RLS
-// [ ] - 	KF Passive Suspension
-// [ ] - 	Inverted Pendulum
-// [ ] -	Robust Suspension
-// [ ] - Cleanup All Finished Applications
+// [✓] - For All Finished Applications correct StateMachine to Stop when Connection Lost
 // [✓] -	KF Tracking
 // [✓] -	RLS
 // [✓] - 	KF Passive Suspension
-// [ ] - 	Inverted Pendulum
-// [ ] -	Robust Suspension
+// [✓] - 	Inverted Pendulum
+// [✓] -	Robust Suspension
+// [✓] - Cleanup All Finished Applications
+// [✓] -	KF Tracking
+// [✓] -	RLS
+// [✓] - 	KF Passive Suspension
+// [✓] - 	Inverted Pendulum
+// [✓] -	Robust Suspension
 
 // [ ] - Change Structure of RLS to send multiple data in one package
-// [ ] - Change Structure of KF Tracking to send multiple data in one package
+// [✓] - Change Structure of KF Tracking to send multiple data in one package
 
 
 global.server_ip = "127.0.0.1"
@@ -36,7 +36,6 @@ const inverted_pendulum = require('./inverted_pendulum')
 
 
 // app.commandLine.appendSwitch('ignore-gpu-blocklist');
-
 
 let win;
 var lastPage = '';

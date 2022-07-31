@@ -1,6 +1,6 @@
-const { SSL_OP_EPHEMERAL_RSA } = require('constants');
-const { app, BrowserWindow, ipcMain } = require('electron')
-// const  fs = require('fs')
+// const { SSL_OP_EPHEMERAL_RSA } = require('constants');
+const { ipcMain } = require('electron')
+
 const net = require('net')
 const { Matrix } = require('ml-matrix');
 
@@ -46,13 +46,17 @@ function connect(ip, port) {
     client = new net.Socket();
 
     client.on('error', function(ex) {
+        _isConnected = false;
+        mainWindow.webContents.send('inverted_pendulum:connection:fail');
+    });
+    client.on('close', function() {
+        _isConnected = false;
         mainWindow.webContents.send('inverted_pendulum:connection:fail');
     });
     
     client.connect(port, ip, function() {
         _isConnected = true;
         mainWindow.webContents.send('inverted_pendulum:connection:pass');
-        console.log('Connected');
     });
 
     client.on('data', function(data) {
@@ -81,7 +85,6 @@ ipcMain.on('inverted_pendulum:tcp:send:state', (event, code, wr, y0, n, h) => {
     if(code == 210) {
         wr = new Matrix( wr )
         y0 = new Matrix( y0 )
-        // console.log(code, wr, y0, n, h)
     
         let str_wr = `${wr.get(0, 0)},${wr.get(1, 0)},${wr.get(2, 0).toFixed(4)},${wr.get(3, 0)}`
         let str_y0 = `${y0.get(0, 0)},${y0.get(1, 0)},${y0.get(2, 0)},${y0.get(3, 0)}`
